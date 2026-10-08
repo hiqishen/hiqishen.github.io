@@ -3,306 +3,193 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#eef3f1" />
+    <meta name="theme-color" content="#f7f9f7" />
     <meta
       name="description"
-      content="c_utils 工具实验室：网页高亮、Markdown 阅读与本地搜索、Mac 防休眠，以及 Codex 主题设计。探索项目、安装包与 GitHub 源码。"
+      content="个人项目导航：探索 c_utils 工具实验室，查阅浏览器扩展的使用说明、隐私政策与本地助手安装指引。"
     />
-    <meta property="og:title" content="c_utils · 工具实验室" />
+    <meta property="og:title" content="项目导航 · 从这里，打开我的项目" />
     <meta
       property="og:description"
-      content="把日常麻烦，写成顺手工具。浏览项目、获取安装包，探索工具背后的代码。"
+      content="工具、作品与使用说明，都从这里出发。"
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://hiqishen.github.io/" />
     <link rel="canonical" href="https://hiqishen.github.io/" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./style.css" />
-    <title>c_utils · 工具实验室</title>
-    <script type="module" src="./app.js"></script>
+    <link rel="stylesheet" href="./portal.css" />
+    <title>项目导航 · 从这里，打开我的项目</title>
   </head>
   <body>
-    <a class="skip-link" href="#projects">跳到项目</a>
-    <svg
-      class="icon-definitions"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <symbol id="icon-arrow" viewBox="0 0 24 24">
-        <path d="M5 12h14m-6-6 6 6-6 6" />
-      </symbol>
-      <symbol id="icon-external" viewBox="0 0 24 24">
-        <path d="M7 17 17 7M7 7h10v10" />
-      </symbol>
-      <symbol id="icon-highlight" viewBox="0 0 24 24">
-        <path d="m9 14 8-8 4 4-8 8-4-4Zm0 0-3 3 4 4 3-3M3 21h7M15 8l4 4" />
-      </symbol>
-      <symbol id="icon-markdown" viewBox="0 0 24 24">
-        <rect x="2" y="5" width="20" height="14" rx="3" />
-        <path d="M6 15V9l3 3 3-3v6m5-6v6m-2-2 2 2 2-2" />
-      </symbol>
-      <symbol id="icon-search" viewBox="0 0 24 24">
-        <circle cx="10" cy="10" r="6" />
-        <path d="m15 15 6 6M7 10h6" />
-      </symbol>
-      <symbol id="icon-gan" viewBox="0 0 24 24">
-        <path
-          d="M4 5h12v9a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V5Zm12 2h2a3 3 0 1 1 0 6h-2M3 22h15M7 2V1m6 1V1"
-        />
-      </symbol>
-      <symbol id="icon-dream" viewBox="0 0 24 24">
-        <path d="m12 2 3 7 7 3-7 3-3 7-3-7-7-3 7-3 3-7Zm7 0v4m-2-2h4" />
-      </symbol>
-      <symbol id="icon-github" viewBox="0 0 24 24">
-        <path
-          d="M9 20c-5 1-5-2-7-2m14 4v-4a4 4 0 0 0-1-3c3-.4 6-1.5 6-6a5 5 0 0 0-1.5-3.5A5 5 0 0 0 19 2s-1.5-.4-4 1a13 13 0 0 0-6 0C6.5 1.6 5 2 5 2a5 5 0 0 0-.5 3.5A5 5 0 0 0 3 9c0 4.5 3 5.6 6 6a4 4 0 0 0-1 3v4"
-        />
-      </symbol>
-      <symbol id="icon-download" viewBox="0 0 24 24">
-        <path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" />
-      </symbol>
-      <symbol id="icon-close" viewBox="0 0 24 24">
-        <path d="m6 6 12 12M6 18 18 6" />
-      </symbol>
-    </svg>
-    <header class="site-header">
-      <a class="brand" href="#top" aria-label="c_utils 首页"
-        ><span class="brand-mark">c<span>_</span></span
-        ><span>c_utils<span class="brand-note">工具实验室</span></span></a
+    <a class="skip-link" href="#sites">跳到子站入口</a>
+    <header class="site-header wrap">
+      <a class="brand" href="./" aria-label="项目导航首页"
+        ><span class="brand-mark" aria-hidden="true">/</span
+        ><span>项目导航<small>PERSONAL INDEX</small></span></a
       >
       <nav aria-label="主要导航">
-        <a href="#projects">项目</a><a href="#downloads">下载</a
-        ><a href="#about">关于</a
+        <a href="#sites">子站入口</a
         ><a
-          class="github-nav"
           href="https://github.com/hiqishen"
           target="_blank"
           rel="noopener noreferrer"
-          ><svg class="icon"><use href="#icon-github" /></svg><span>GitHub</span
-          ><svg class="icon tiny"><use href="#icon-external" /></svg
-        ></a>
+          >GitHub <span aria-hidden="true">↗</span
+          ><span class="sr-only">（新窗口打开）</span></a
+        >
       </nav>
     </header>
     <main id="top">
       <section class="hero wrap" aria-labelledby="hero-title">
         <div class="hero-copy">
           <p class="eyebrow">
-            <span class="status-dot"></span> SMALL TOOLS. REAL USE.
+            <span class="status-dot" aria-hidden="true"></span
+            >一个起点，几个去处
           </p>
           <h1 id="hero-title">
-            把日常麻烦，<br />写成<span class="underlined"
-              >顺手工具<svg viewBox="0 0 350 20" aria-hidden="true">
-                <path d="M4 12Q155-2 346 9M8 17Q207 8 310 14" /></svg></span
+            从这里，<br />打开<span class="title-accent"
+              >我的项目<span
+                class="accent-line"
+                aria-hidden="true"
+              ></span></span
             >。
           </h1>
           <p class="hero-description">
-            从浏览器里的一笔高亮，到桌面上的一杯不眠咖啡。<br
-              class="desktop-break"
-            />这里收集我为真实需求写下的小工具。
+            写些顺手的工具，留下好用的入口。<br />想探索项目，或找一份安装说明，<br
+              class="wide-break"
+            />沿着下面的路标就能到达。
           </p>
-          <div class="hero-actions">
-            <a class="button primary" href="#projects"
-              >探索项目<svg class="icon"><use href="#icon-arrow" /></svg></a
-            ><a class="text-link" href="#downloads"
-              >获取安装包<svg class="icon"><use href="#icon-download" /></svg
-            ></a>
-          </div>
-          <div class="hero-footnote">
-            <span class="code-label">~/c_utils</span
-            ><span>浏览器 · 桌面 · AI 工作流</span>
-          </div>
+          <a class="primary-link" href="#sites"
+            >选择一个去处 <span aria-hidden="true">↓</span></a
+          >
+          <p class="hero-note">
+            <span aria-hidden="true">↳</span> 工具与文档，各有自己的空间。
+          </p>
         </div>
-        <div class="constellation" aria-label="工具星轨，选择图标预览项目">
-          <div class="orbit orbit-outer"></div>
-          <div class="orbit orbit-inner"></div>
-          <div class="orbit-axis"></div>
-          <span class="coordinate coord-top">PERSONAL TOOLBOX / 2026</span
-          ><span class="coordinate coord-bottom">BUILT FOR EVERYDAY USE</span>
-          <div class="core">
-            <span class="core-bracket">{</span
-            ><span class="core-letter">c<span>_</span></span
-            ><span class="core-bracket">}</span
-            ><span class="core-caption">USEFUL BY DESIGN</span>
+        <nav class="directory" aria-labelledby="directory-title">
+          <div class="directory-bar">
+            <span class="directory-tab"
+              ><span aria-hidden="true">⌘</span> 站点目录</span
+            ><span class="directory-label">CLICK TO EXPLORE</span>
           </div>
-          <button
-            class="satellite satellite-highlight active"
-            data-project="highlighter"
-            aria-label="预览网页划线高亮"
-            aria-pressed="true"
-          >
-            <svg class="icon"><use href="#icon-highlight" /></svg
-            ><span>高亮</span>
-          </button>
-          <button
-            class="satellite satellite-markdown"
-            data-project="markdown"
-            aria-label="预览 Markdown Plus"
-            aria-pressed="false"
-          >
-            <svg class="icon"><use href="#icon-markdown" /></svg
-            ><span>Markdown</span>
-          </button>
-          <button
-            class="satellite satellite-search"
-            data-project="search"
-            aria-label="预览 Local Markdown Search"
-            aria-pressed="false"
-          >
-            <svg class="icon"><use href="#icon-search" /></svg><span>搜索</span>
-          </button>
-          <button
-            class="satellite satellite-gan"
-            data-project="gan"
-            aria-label="预览 gan 防休眠"
-            aria-pressed="false"
-          >
-            <svg class="icon"><use href="#icon-gan" /></svg><span>不休眠</span>
-          </button>
-          <button
-            class="satellite satellite-dream"
-            data-project="dream"
-            aria-label="预览 codex-dream-skill"
-            aria-pressed="false"
-          >
-            <svg class="icon"><use href="#icon-dream" /></svg
-            ><span>DreamSkin</span>
-          </button>
-          <a
-            class="orbit-preview"
-            href="#project-highlighter"
-            id="orbit-preview"
-            ><span class="preview-dot"></span
-            ><span
-              ><strong id="preview-title">网页划线高亮</strong
-              ><small id="preview-text">让读过的网页，留下线索。</small></span
-            ><svg class="icon"><use href="#icon-external" /></svg
-          ></a>
-        </div>
+          <div class="directory-body">
+            <div class="directory-root">
+              <span class="root-glyph" aria-hidden="true">/</span>
+              <div>
+                <h2 id="directory-title">我的项目空间</h2>
+                <p>从根目录，走到你需要的地方</p>
+              </div>
+            </div>
+            <ul class="tree">
+              <li class="tree-branch">
+                <a class="tree-main" href="./c_utils/"
+                  ><span class="folder-icon" aria-hidden="true"></span
+                  ><span
+                    ><strong>c_utils/</strong><small>工具实验室</small></span
+                  ><span class="tree-arrow" aria-hidden="true">↗</span></a
+                >
+              </li>
+              <li class="tree-branch">
+                <a class="tree-main" href="/extension-publishing/"
+                  ><span class="folder-icon" aria-hidden="true"></span
+                  ><span
+                    ><strong>extension-publishing/</strong
+                    ><small>扩展公开资料</small></span
+                  ><span class="tree-arrow" aria-hidden="true">↗</span></a
+                >
+                <ul class="tree tree-nested">
+                  <li>
+                    <a href="/extension-publishing/markdown-plus/native-host/"
+                      ><span>Markdown Plus</span><small>本地助手安装</small
+                      ><span aria-hidden="true">↗</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="/extension-publishing/local-markdown-search/"
+                      ><span>Local Markdown Search</span
+                      ><small>使用与安装</small
+                      ><span aria-hidden="true">↗</span></a
+                    >
+                  </li>
+                  <li>
+                    <a href="/extension-publishing/web-highlighter/"
+                      ><span>网页划线高亮</span><small>使用说明</small
+                      ><span aria-hidden="true">↗</span></a
+                    >
+                  </li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+          <p class="directory-footer">
+            <span aria-hidden="true">●</span> 每一个目录，都可以打开。
+          </p>
+        </nav>
       </section>
-      <div class="tool-strip" aria-hidden="true">
-        <div class="wrap">
-          <span>HIGHLIGHT & ANNOTATE</span><span class="strip-plus">+</span
-          ><span>READ & WRITE</span><span class="strip-plus">+</span
-          ><span>SEARCH LOCAL</span><span class="strip-plus">+</span
-          ><span>STAY AWAKE</span><span class="strip-plus">+</span
-          ><span>MAKE IT YOURS</span>
-        </div>
-      </div>
       <section
-        class="projects-section wrap"
-        id="projects"
-        aria-labelledby="projects-title"
+        class="sites-section wrap"
+        id="sites"
+        aria-labelledby="sites-title"
       >
         <div class="section-heading">
-          <div>
-            <p class="eyebrow">THE COLLECTION</p>
-            <h2 id="projects-title">
-              小工具，各有所长<span class="heading-dot">.</span>
-            </h2>
-          </div>
-          <p class="section-description">
-            专注一件事，把它做顺手。<br />选一个，开始你的下一段工作流。
-          </p>
+          <h2 id="sites-title">你想去哪里？</h2>
+          <p>按目的选入口，少绕一点路。</p>
         </div>
-        <div class="filter-bar">
-          <div class="filters" role="group" aria-label="筛选项目">
-            <button class="filter active" data-filter="all" aria-pressed="true">
-              全部项目 <span>5</span></button
-            ><button class="filter" data-filter="browser" aria-pressed="false">
-              浏览器扩展</button
-            ><button class="filter" data-filter="desktop" aria-pressed="false">
-              桌面工具</button
-            ><button class="filter" data-filter="ai" aria-pressed="false">
-              AI 工作流
-            </button>
-          </div>
-          <span class="collection-label">A PERSONAL COLLECTION</span>
-        </div>
-        <p class="sr-only" id="filter-status" role="status"></p>
-        <div class="project-grid" id="project-grid"></div>
-        <noscript
-          ><div class="noscript-projects">
-            <p>开启 JavaScript 可查看项目卡片和安装包选择器；也可直接访问：</p>
-            <a
-              href="https://hiqishen.github.io/extension-publishing/web-highlighter/"
-              >网页划线高亮</a
-            ><a
-              href="https://hiqishen.github.io/extension-publishing/markdown-plus/native-host/"
-              >Markdown Plus 本地助手</a
-            ><a
-              href="https://hiqishen.github.io/extension-publishing/local-markdown-search/"
-              >Local Markdown Search</a
-            ><a href="https://github.com/hiqishen/c_utils"
-              >gan 与 DreamSkin 源码（需访问权限）</a
-            >
-          </div></noscript
-        >
-      </section>
-      <section
-        class="downloads-section wrap"
-        id="downloads"
-        aria-labelledby="downloads-title"
-      >
-        <div class="download-intro">
-          <p class="eyebrow">READY WHEN YOU ARE</p>
-          <h2 id="downloads-title">找到工具，<br />带走就用。</h2>
-          <p>
-            扩展、桌面应用和本地助手分开列出。<br />按你的系统选择，再跟着安装说明开始。
-          </p>
-          <a
-            class="text-link"
-            href="https://hiqishen.github.io/extension-publishing/"
-            target="_blank"
-            rel="noopener noreferrer"
-            >查看公开使用与安装说明<svg class="icon">
-              <use href="#icon-external" /></svg
-          ></a>
-        </div>
-        <div class="download-list" id="download-list"></div>
-      </section>
-      <section
-        class="about-section wrap"
-        id="about"
-        aria-labelledby="about-title"
-      >
-        <div class="about-heading">
-          <p class="eyebrow">BEHIND THE TOOLS</p>
-          <h2 id="about-title">先有需求，<br />再有工具。</h2>
-        </div>
-        <div class="about-copy">
-          <p class="about-lead">
-            有些麻烦不大，却每天都在发生。<br />所以，我把它们写成了代码。
-          </p>
-          <p>
-            c_utils
-            是我的个人工具集合：保存读过的内容，找到本机的笔记，让长任务安心跑完，或者把工作界面变成喜欢的样子。每个项目，都从一个具体的小需求出发。
-          </p>
-          <div class="principles">
-            <span><i></i>为日常使用而做</span
-            ><span><i></i>在细节里持续打磨</span
-            ><span><i></i>让数据留在自己手里</span>
-          </div>
+        <div class="site-grid">
+          <a class="site-card tools-card" href="./c_utils/">
+            <div class="card-top">
+              <span class="card-category">探索与下载</span
+              ><span class="card-arrow" aria-hidden="true">↗</span>
+            </div>
+            <h3>c_utils<span>工具实验室</span></h3>
+            <p>
+              看看为日常需求写下的 5 个工具，<br
+                class="wide-break"
+              />找到适合你的下一个工作搭档。
+            </p>
+            <ul class="card-tags" aria-label="子站内容">
+              <li>项目展示</li>
+              <li>Chrome 安装</li>
+              <li>桌面 / Skill 下载</li>
+            </ul>
+            <div class="card-bottom">
+              <span class="path-label">/c_utils/</span
+              ><span>进入实验室 <span aria-hidden="true">→</span></span>
+            </div>
+          </a>
+          <a class="site-card docs-card" href="/extension-publishing/">
+            <div class="card-top">
+              <span class="card-category">使用与安装</span
+              ><span class="card-arrow" aria-hidden="true">↗</span>
+            </div>
+            <h3>扩展公开资料<span>把工具用起来</span></h3>
+            <p>
+              查使用方法、确认隐私政策，<br
+                class="wide-break"
+              />跟着指引安装需要的本地助手。
+            </p>
+            <ul class="card-tags" aria-label="子站内容">
+              <li>使用说明</li>
+              <li>隐私政策</li>
+              <li>本地助手安装</li>
+            </ul>
+            <div class="card-bottom">
+              <span class="path-label">/extension-publishing/</span
+              ><span>打开资料 <span aria-hidden="true">→</span></span>
+            </div>
+          </a>
         </div>
       </section>
     </main>
     <footer class="site-footer wrap">
-      <a class="footer-brand" href="#top"
-        >c_utils<span> / 少一点麻烦，多一点顺手。</span></a
-      ><span>© <span id="year">2026</span> · Built with curiosity.</span
+      <a href="./" class="footer-home"
+        >/ <span>少一点麻烦，多一点顺手。</span></a
       ><a
         href="https://github.com/hiqishen"
         target="_blank"
         rel="noopener noreferrer"
-        >GitHub<svg class="icon tiny"><use href="#icon-external" /></svg
-      ></a>
+        >去 GitHub 看看 <span aria-hidden="true">↗</span
+        ><span class="sr-only">（新窗口打开）</span></a
+      >
     </footer>
-    <dialog id="project-dialog" aria-labelledby="dialog-title">
-      <div class="dialog-body">
-        <button class="dialog-close" aria-label="关闭项目详情">
-          <svg class="icon"><use href="#icon-close" /></svg>
-        </button>
-        <div id="dialog-content"></div>
-      </div>
-    </dialog>
   </body>
 </html>
