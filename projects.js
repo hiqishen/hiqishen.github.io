@@ -33,6 +33,7 @@ export const projects = [
     category: "browser",
     categoryLabel: "浏览器扩展",
     folder: "markdown-plus",
+    githubFolder: "md-reader-editor",
     icon: "markdown",
     codeName: "READ / EDIT / SAVE",
     tagline: "从打开一份 Markdown 开始。",
@@ -121,4 +122,4 @@ export const projects = [
       "这是 Codex Skill 资源包，不是桌面应用安装器，也不包含成品主题。解压后检查 ~/.agents/skills/codex-dream-skill 是否已存在；确认不会覆盖已有内容后，将完整目录复制到 ~/.agents/skills/，重新打开 Codex 会话并调用 $codex-dream-skill。现有运行探测脚本面向 macOS。",
     art: '<div class="dream-window"><div class="dream-header"><span>CODEX / DREAMSKIN</span><span>✦</span></div><div class="dream-body"><svg class="icon"><use href="#icon-dream"/></svg><span>把界面，调成喜欢的样子。</span></div><div class="dream-swatches"><i></i><i></i><i></i><i></i></div></div>',
   },
-].map((project) => ({ ...project, source: sourceRoot + project.folder }));
+].map((project) => ({ ...project, source: sourceRoot + (project.githubFolder || project.folder) }));

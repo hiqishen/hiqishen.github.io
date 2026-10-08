@@ -1,5 +1,5 @@
 {
-  "releaseUrl": null,
+  "releaseUrl": "https://github.com/hiqishen/hiqishen.github.io/releases/tag/toolbox-2026.10.08",
   "checkedAt": "2026-10-08",
   "packages": [
     {
@@ -11,9 +11,9 @@
       "size": 5945910,
       "file": "gan-v0.2.11-macos-arm64.dmg",
       "sha256": "edf0d4033c47303d4a3175b6b1fbc9ef7aae1e3d5c550116e63d430ad0b82014",
-      "url": null,
+      "url": "https://github.com/hiqishen/hiqishen.github.io/releases/download/toolbox-2026.10.08/gan-v0.2.11-macos-arm64.dmg",
       "previewUrl": "./downloads/gan-v0.2.11-macos-arm64.dmg",
-      "access": "prepared",
+      "access": "public",
       "kind": "application-dmg"
     },
     {
@@ -25,9 +25,9 @@
       "size": 11098,
       "file": "codex-dream-skill-source-20261008.zip",
       "sha256": "4534780349d30d405776c0ba2c346d9cb65258177052c85d72afb5246ffd1044",
-      "url": null,
+      "url": "https://github.com/hiqishen/hiqishen.github.io/releases/download/toolbox-2026.10.08/codex-dream-skill-source-20261008.zip",
       "previewUrl": "./downloads/codex-dream-skill-source-20261008.zip",
-      "access": "prepared",
+      "access": "public",
       "kind": "skill-resource-zip"
     },
     {
