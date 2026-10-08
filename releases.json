@@ -1,0 +1,99 @@
+{
+  "releaseUrl": null,
+  "checkedAt": "2026-10-08",
+  "packages": [
+    {
+      "project": "gan",
+      "label": "gan 预发布 DMG",
+      "version": "0.2.11",
+      "platform": "macOS 13+ · Apple Silicon",
+      "sizeLabel": "5.7 MiB",
+      "size": 5945910,
+      "file": "gan-v0.2.11-macos-arm64.dmg",
+      "sha256": "edf0d4033c47303d4a3175b6b1fbc9ef7aae1e3d5c550116e63d430ad0b82014",
+      "url": null,
+      "previewUrl": "./downloads/gan-v0.2.11-macos-arm64.dmg",
+      "access": "prepared",
+      "kind": "application-dmg"
+    },
+    {
+      "project": "dream",
+      "label": "codex-dream-skill 资源包",
+      "version": "2026-10-08 源码快照",
+      "platform": "Codex · macOS 辅助脚本",
+      "sizeLabel": "10.8 KiB",
+      "size": 11098,
+      "file": "codex-dream-skill-source-20261008.zip",
+      "sha256": "4534780349d30d405776c0ba2c346d9cb65258177052c85d72afb5246ffd1044",
+      "url": null,
+      "previewUrl": "./downloads/codex-dream-skill-source-20261008.zip",
+      "access": "prepared",
+      "kind": "skill-resource-zip"
+    },
+    {
+      "project": "markdown",
+      "label": "Markdown Plus 商店版本地助手",
+      "version": "0.1.1",
+      "platform": "macOS · Apple Silicon",
+      "sizeLabel": "20.2 MiB",
+      "size": 21202121,
+      "file": "Markdown-Plus-Native-Host-0.1.1-arm64-unsigned-public.zip",
+      "sha256": "737d3f1435ec66d00f0bd412cc60c953615dd0652c9f77bb433ca6eb155622b6",
+      "url": "https://github.com/hiqishen/extension-publishing/releases/download/markdown-plus-v0.1.1/Markdown-Plus-Native-Host-0.1.1-arm64-unsigned-public.zip",
+      "access": "public",
+      "kind": "native-host-zip"
+    },
+    {
+      "project": "markdown",
+      "label": "Markdown Plus 商店版本地助手",
+      "version": "0.1.1",
+      "platform": "macOS · Intel x64",
+      "sizeLabel": "22.6 MiB",
+      "size": 23658327,
+      "file": "Markdown-Plus-Native-Host-0.1.1-x64-unsigned-public.zip",
+      "sha256": "8ccd16c488904c13722ff46f8e8f7e59572aee1068aa99113888378271d8bcfb",
+      "url": "https://github.com/hiqishen/extension-publishing/releases/download/markdown-plus-v0.1.1/Markdown-Plus-Native-Host-0.1.1-x64-unsigned-public.zip",
+      "access": "public",
+      "kind": "native-host-zip"
+    },
+    {
+      "project": "markdown",
+      "label": "Markdown Plus 商店版本地助手",
+      "version": "0.1.1",
+      "platform": "Windows · x64",
+      "sizeLabel": "37.8 MiB",
+      "size": 39681249,
+      "file": "Markdown-Plus-Native-Host-0.1.1-windows-x64.zip",
+      "sha256": "73c38a2ad316bc90dfbac59810f9da259531b166e0f0461d52bf7a604e2c3f82",
+      "url": "https://github.com/hiqishen/extension-publishing/releases/download/markdown-plus-v0.1.1/Markdown-Plus-Native-Host-0.1.1-windows-x64.zip",
+      "access": "public",
+      "kind": "native-host-zip"
+    },
+    {
+      "project": "markdown",
+      "label": "Markdown Plus 商店版本地助手",
+      "version": "0.1.1",
+      "platform": "Windows · ARM64",
+      "sizeLabel": "34.6 MiB",
+      "size": 36275518,
+      "file": "Markdown-Plus-Native-Host-0.1.1-windows-arm64.zip",
+      "sha256": "727197a4f6a57a2d5f7447aebfbed41e8b4b3793db9f2b4abd96237ae419ad99",
+      "url": "https://github.com/hiqishen/extension-publishing/releases/download/markdown-plus-v0.1.1/Markdown-Plus-Native-Host-0.1.1-windows-arm64.zip",
+      "access": "public",
+      "kind": "native-host-zip"
+    },
+    {
+      "project": "search",
+      "label": "Local Markdown Search 本机助手",
+      "version": "1.0.8",
+      "platform": "macOS / Windows",
+      "sizeLabel": "9.6 KiB",
+      "size": 9849,
+      "file": "local-markdown-search-native-host.zip",
+      "sha256": "d865cc1620ce86e7b47704709b65dd8a1d5ce251cc254e6c4e58987f9848dbbd",
+      "url": "https://github.com/hiqishen/extension-publishing/releases/download/local-markdown-search-v1.0.8/local-markdown-search-native-host.zip",
+      "access": "public",
+      "kind": "native-host-zip"
+    }
+  ]
+}
