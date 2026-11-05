@@ -6,7 +6,7 @@
 <title>DSH Atlas · 插件与生态导航</title>
 <link rel="canonical" href="https://hiqishen.github.io/dsh/">
 <link rel="icon" href="./favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="./atlas.css?v=1c395d015">
+<link rel="stylesheet" href="./atlas.css?v=13474a413">
 </head>
 <body>
 <a class="skip-link" href="#catalog">跳到插件目录</a>
@@ -95,7 +95,10 @@
         </div>
         <div class="cards" id="cards"></div>
         <div class="bottom" id="pagination"><span id="pageInfo"></span>
-          <nav class="pager" aria-label="结果分页"><button type="button" class="pagebutton" id="prevBtn">← 上一页</button><button type="button" class="pagebutton" id="nextBtn">下一页 →</button></nav>
+          <nav class="pager" aria-label="结果分页">
+            <label class="page-size">每页 <input type="number" id="pageSize" min="1" step="1" inputmode="numeric" aria-label="每页显示数量" aria-describedby="pageSizeError"> 项</label>
+            <button type="button" class="pagebutton" id="prevBtn">← 上一页</button><button type="button" class="pagebutton" id="nextBtn">下一页 →</button></nav>
+          <span id="pageSizeError" class="page-size-error" role="status" hidden></span>
         </div>
       </section>
     </div>
@@ -119,7 +122,7 @@
   </dialog>
   <footer class="footer"><p>DSH Atlas · 精选快照 2026.11.03</p><nav aria-label="目录帮助"><a href="#install-guide">安装指南</a> · <a href="#data-sources">数据来源</a></nav><p>收藏保存在当前浏览器</p></footer>
 </div>
-<script src="./catalog-location.js?v=0b9e5ad2c"></script>
+<script src="./catalog-location.js?v=84ab89ec6"></script>
 <script src="./catalog-search.js?v=2273a8da4"></script>
 <script src="./catalog-sources.js?v=c2763f625"></script>
 <script src="./catalog-market-scans.js?v=71f4189f1"></script>
@@ -592,7 +595,7 @@ function unresolvedBookmarks() {
     return !sameRepo(repo) && (!group || (group.count !== 1 && group.roots !== 1));
   }).map(repo => ({repo, url:githubLink({repo})}));
 }
-const $=id=>document.getElementById(id), PAGE_SIZE=48;
+const $=id=>document.getElementById(id);
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number=x=>Number(x).toLocaleString('zh-CN');
 const fnum=x=>new Intl.NumberFormat('zh-CN',{notation:x>=10000?'compact':'standard',maximumFractionDigits:1}).format(x);
@@ -668,6 +671,7 @@ function restoreView() {
   debounce = null;
   searchDraft = searchComposing = false;
   Object.assign(dataState, readCatalogView(window.location.href));
+  syncPageSize();
   if ($('search').value !== dataState.search) $('search').value = dataState.search;
   const full = dataState.mode === 'full';
   dataState.all = full ? (dataState.full || []) : CURATED;
@@ -1066,9 +1070,9 @@ function render() {
   }
   const results = catalogResults();
   filters(results);
-  const matches = results.matches, pages = Math.max(1, Math.ceil(matches.length / PAGE_SIZE));
+  const matches = results.matches, pages = Math.max(1, Math.ceil(matches.length / dataState.pageSize));
   dataState.page=Math.max(0,Math.min(dataState.page,pages-1));
-  const start=dataState.page*PAGE_SIZE,batch=matches.slice(start,start+PAGE_SIZE);
+  const start=dataState.page*dataState.pageSize,batch=matches.slice(start,start+dataState.pageSize);
   const facets = activeFacetCount() > 0;
   const curatedSearch = dataState.mode === 'curated' && dataState.search.trim();
   visibleProjects = batch;
@@ -1101,6 +1105,36 @@ function render() {
   $('pageInfo').textContent=(batch.length?number(start+1)+'–'+number(start+batch.length):'0')+' / '+number(matches.length)+' · 第 '+(dataState.page+1)+' / '+pages+' 页';
   $('prevBtn').disabled=dataState.page===0;$('nextBtn').disabled=dataState.page>=pages-1;
 }
+function syncPageSize() {
+  $('pageSize').value = String(dataState.pageSize);
+  $('pageSizeError').hidden = true;
+}
+function applyPageSize() {
+  const size = parsePageSize($('pageSize').value);
+  if (size === null) {
+    $('pageSize').value = String(dataState.pageSize);
+    $('pageSizeError').textContent = '请输入 1–' + maxPageSize + ' 之间的整数。';
+    $('pageSizeError').hidden = false;
+    return;
+  }
+  const firstIndex = dataState.page * dataState.pageSize;
+  if (size !== dataState.pageSize) {
+    flushSearch();
+    dataState.pageSize = size;
+    changedView('push', Math.floor(firstIndex / size));
+  }
+  syncPageSize();
+}
+$('pageSize').max = String(maxPageSize);
+syncPageSize();
+$('pageSize').onchange = applyPageSize;
+$('pageSize').oninput = () => { $('pageSizeError').hidden = true; };
+$('pageSize').onkeydown = event => {
+  if (event.key === 'Enter' && !event.isComposing && event.keyCode !== 229) {
+    event.preventDefault();
+    applyPageSize();
+  }
+};
 function goPage(delta){changedView('push', dataState.page + delta);$('resultSummary').focus({preventScroll:true});$('resultSummary').scrollIntoView({block:'start'});}
 $('seedCount').textContent=CURATED.length;
 $('retryLoad').onclick = () => loadFull(true);

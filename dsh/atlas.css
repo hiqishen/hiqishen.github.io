@@ -159,8 +159,11 @@ mark { padding: 0 1px; color: var(--ink); background: #f3dfb8; }
 .project-date { cursor: help; white-space: nowrap; }
 .date-help { position: absolute; z-index: 3; bottom: calc(100% + 8px); left: 0; display: none; width: 100%; padding: 9px 11px; white-space: normal; background: var(--ink); color: var(--surface); border-radius: 3px; font: 11px/1.8 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; box-shadow: 0 4px 16px #26292318; }
 .project-date:hover .date-help, .project-date:focus .date-help { display: block; }
-.bottom { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 22px; color: var(--muted); font-size: 11px; }
-.pager { display: flex; gap: 8px; }
+.bottom { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; margin-top: 22px; color: var(--muted); font-size: 11px; }
+.pager { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-inline-start: auto; }
+.page-size { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.page-size input { width: 4.5em; min-height: 35px; padding: 5px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); color: var(--ink); font: inherit; font-variant-numeric: tabular-nums; }
+.page-size-error { flex-basis: 100%; text-align: end; color: var(--accent); }
 .pagebutton { min-height: 35px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); font-size: 11px; }
 .pagebutton:hover:enabled { border-color: var(--muted); }
 .pagebutton:disabled { cursor: default; color: #a3a69c; background: transparent; }
@@ -285,6 +288,7 @@ mark { padding: 0 1px; color: var(--ink); background: #f3dfb8; }
   .project-dates { gap: 12px; }
   .bottom { grid-area: bottom; margin-top: 18px; gap: 10px; font-size: 12px; }
   .pager { gap: 6px; }
+  .page-size input { min-height: 40px; }
   .pagebutton { min-height: 40px; padding: 6px 10px; font-size: 12px; }
   .guide { margin-top: 27px; padding-top: 15px; }
   .guide-grid { grid-template-columns: 1fr; gap: 20px; }
@@ -313,7 +317,6 @@ mark { padding: 0 1px; color: var(--ink); background: #f3dfb8; }
   .tab { font-size: 12px; }
   .tab-count, .tab b { font-size: 11px; }
   .sort-field > span { display: none; }
-  .bottom { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
