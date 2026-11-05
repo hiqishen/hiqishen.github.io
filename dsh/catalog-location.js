@@ -1,14 +1,15 @@
 const catalogViewDefaults = Object.freeze({
-  mode: 'curated', search: '', category: '全部', kind: '全部', availability: 'all',
+  mode: 'curated', search: '', category: '全部', kind: '全部', availability: 'all', scan: 'all',
   native: false, recommended: false, favoritesOnly: false, sort: 'auto', page: 0
 });
 const viewParams = {
-  mode: 'scope', search: 'q', category: 'category', kind: 'type', availability: 'install',
+  mode: 'scope', search: 'q', category: 'category', kind: 'type', availability: 'install', scan: 'scan',
   native: 'native', recommended: 'picked', favoritesOnly: 'saved', sort: 'sort', page: 'page'
 };
 const viewChoices = {
   mode: ['curated', 'full'],
   availability: ['all', 'copyable', 'manual', 'unverified', 'broken', 'ecosystem'],
+  scan: ['all', 'reported', 'review'],
   sort: ['auto', 'priority', 'stars', 'date', 'name']
 };
 

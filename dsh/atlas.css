@@ -100,7 +100,7 @@ mark { padding: 0 1px; color: var(--ink); background: #f3dfb8; }
 .online[data-state="loading"] p::before { content: ""; display: inline-block; width: 14px; height: 14px; margin-right: 8px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; vertical-align: -.15em; animation: load-spin .85s linear infinite; }
 @keyframes load-spin { to { transform: rotate(1turn); } }
 .online button { min-height: 40px; margin: 12px 4px 0; padding: 6px 12px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); }
-.online #retryLoad { background: var(--map-ink); color: var(--paper); }
+.online #retryLoad, .online #retryScan { background: var(--map-ink); color: var(--paper); }
 .cards { border-top: 2px solid #73796a; }
 .card { min-width: 0; padding: 18px 0 12px; border-bottom: 1px solid var(--line); }
 .card:focus-within { border-bottom-color: #999e8f; }
@@ -246,7 +246,6 @@ mark { padding: 0 1px; color: var(--ink); background: #f3dfb8; }
   .filter-title { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 40px; padding: 6px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); font-size: 12px; white-space: nowrap; }
   .filter-title[aria-expanded="true"] { color: var(--accent); border-color: #dfd3c9; background: var(--accent-soft); }
   .filter-body { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 15px; padding-bottom: 18px; }
-  .filter-body > .field:first-child { grid-column: 1 / -1; }
   .field { gap: 5px; }
   .field select { min-height: 40px; }
   .filter-toggles { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 13px 20px; padding-top: 13px; }

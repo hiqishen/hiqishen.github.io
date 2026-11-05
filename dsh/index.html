@@ -58,6 +58,9 @@
               <option value="all">全部安装状态</option><option value="copyable">有安装地址</option><option value="manual">需按说明安装</option>
               <option value="unverified">地址未核实</option><option value="broken">索引标记失效</option><option value="ecosystem">非直接安装插件</option>
             </select></label>
+            <label class="field"><span>第三方扫描</span><select id="scanSelect">
+              <option value="all">全部扫描状态</option><option value="reported">有扫描报告</option><option value="review">需复核</option>
+            </select></label>
             <div class="filter-toggles">
               <label class="checkline"><input type="checkbox" id="onlyNative">仅 DSH 插件</label>
               <label class="checkline"><input type="checkbox" id="onlyRecommended">优先体验</label>
@@ -86,6 +89,7 @@
           <p id="loadNotice"></p>
           <div id="loadActions" hidden>
             <button type="button" id="retryLoad">重新加载</button>
+            <button type="button" id="retryScan" hidden>重试扫描摘要</button>
             <button type="button" id="browseCurated">浏览精选目录</button>
           </div>
         </div>
@@ -795,6 +799,10 @@ function catalogResults() {
     if (dataState.recommended && project.score < 2) continue;
     if (dataState.favoritesOnly && !isFavorite(project)) continue;
     if (dataState.availability !== 'all' && getInstallInfo(project).state !== dataState.availability) continue;
+    if (dataState.scan !== 'all') {
+      const report = marketScanFor(project, marketScans);
+      if (!report || (dataState.scan === 'review' && report.status !== 'REVIEW')) continue;
+    }
     const rank = query.phrase ? catalogRank(project, query) : 0;
     if (query.phrase && !rank) continue;
     const categoryMatches = dataState.category === '全部' || project.category === dataState.category;
@@ -824,7 +832,7 @@ function renderFacet(id, counts, selected, label) {
     + options.map(([name, n]) => `<option value="${esc(name)}">${esc(name)} · ${number(n)}</option>`).join('');
   $(id).value = selected;
 }
-const facetKeys = ['category','kind','availability','native','recommended','favoritesOnly'];
+const facetKeys = ['category','kind','availability','scan','native','recommended','favoritesOnly'];
 function activeFacetCount() {
   return facetKeys.filter(key => dataState[key] !== catalogViewDefaults[key]).length;
 }
@@ -833,6 +841,7 @@ function filters(results) {
   renderFacet('kindSelect', results?.kinds, dataState.kind, '全部类型');
   $('showResults').textContent = results ? '查看 ' + number(results.matches.length) + ' 个结果' : '查看状态';
   $('installSelect').value=dataState.availability;
+  $('scanSelect').value=dataState.scan;
   $('onlyRecommended').checked=dataState.recommended;$('onlyNative').checked=dataState.native;$('onlyFavorites').checked=dataState.favoritesOnly;
   $('clearSearch').hidden=!$('search').value;
   $('autoSortLabel').textContent = dataState.search.trim() ? '匹配程度 · 默认' : '推荐优先 · 默认';
@@ -898,22 +907,39 @@ function highlightText(text, query) {
 }
 const bookmarkIcon = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M6 4h12v17l-6-4-6 4z" stroke-linejoin="round"/></svg>';
 let marketScans = null;
+let marketScanStatus = 'idle';
 let visibleProjects = [];
-async function loadMarketScanSnapshot() {
+async function loadMarketScanSnapshot(retrying = false) {
+  if (marketScanStatus === 'loading' || marketScans) return;
+  marketScanStatus = 'loading';
+  if (dataState.scan !== 'all') render();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
   try {
-    const response = await fetch('./market-scans.json', {credentials:'omit'});
+    const response = await fetch('./market-scans.json', {credentials:'omit', signal:controller.signal});
     if (!response.ok) throw new Error('报告摘要不可用');
     const snapshot = await response.json();
     marketScans = marketScanIndex(snapshot);
+    marketScanStatus = 'ready';
     const date = dateOnly(snapshot.fetchedAt);
     if (date) $('marketDataStatus').textContent = ' 摘要更新于 ' + date + '（UTC）。';
-    const cards = $('cards').querySelectorAll('article.card');
-    cards.forEach((card, i) => {
+  } catch {
+    marketScanStatus = 'error';
+    $('marketDataStatus').textContent = '扫描摘要暂未载入。';
+  } finally {
+    clearTimeout(timeout);
+  }
+  if (dataState.scan !== 'all') {
+    render();
+    if (marketScans && (dataState.mode !== 'full' || dataState.full)) writeView('replace');
+    if (retrying && document.activeElement === document.body) {
+      $(marketScans ? 'resultSummary' : 'retryScan').focus({preventScroll:true});
+    }
+  } else if (marketScans) {
+    $('cards').querySelectorAll('article.card').forEach((card, i) => {
       const slot = card.querySelector('.market-scan[hidden]');
       if (slot && visibleProjects[i]) slot.outerHTML = marketScanSlot(visibleProjects[i], marketScans);
     });
-  } catch {
-    $('marketDataStatus').textContent = '扫描摘要暂未载入。';
   }
 }
 function showCard(p) {
@@ -973,8 +999,12 @@ function toggleFavorite(key) {
   (next || $('resultSummary')).focus({preventScroll:true});
 }
 function render() {
-  const unavailable = dataState.mode === 'full' && !dataState.full;
+  const waitingForCatalog = dataState.mode === 'full' && !dataState.full;
+  const waitingForScan = !waitingForCatalog && dataState.scan !== 'all' && !marketScans;
+  const unavailable = waitingForCatalog || waitingForScan;
   updateTabs();
+  $('retryScan').hidden = !waitingForScan;
+  $('retryLoad').hidden = $('browseCurated').hidden = waitingForScan;
   const incomplete = dataState.mode === 'full' && dataState.full && dataState.fullStatus !== 'ready';
   $('onlineInfo').hidden = !(unavailable || incomplete);
   if (incomplete) {
@@ -985,13 +1015,19 @@ function render() {
     $('onlineInfo').dataset.state = loading ? 'loading' : 'partial';
   }
   $('cards').hidden = $('pagination').hidden = unavailable;
-  $('cards').setAttribute('aria-busy', String(unavailable && dataState.fullStatus === 'loading'));
+  const loadStatus = waitingForScan ? marketScanStatus : dataState.fullStatus;
+  $('cards').setAttribute('aria-busy', String(unavailable && loadStatus !== 'error'));
   if (unavailable) {
     filters(null);
-    const failed = dataState.fullStatus === 'error';
-    const heading = failed ? '社区加载失败' : '正在加载…';
+    const failed = loadStatus === 'error';
+    const heading = waitingForScan ? (failed ? '扫描摘要加载失败' : '正在加载扫描摘要…')
+      : (failed ? '社区加载失败' : '正在加载…');
     if ($('resultSummary').innerHTML !== heading) $('resultSummary').innerHTML = heading;
-    $('loadNotice').textContent = failed ? '两个社区目录都未能载入。可以重试，或先浏览精选目录。' : '社区目录加载后将自动显示结果。';
+    if (waitingForScan) {
+      $('loadNotice').textContent = failed ? '无法读取扫描摘要。可以重试，或在筛选区选择「全部扫描状态」。' : '摘要载入后将显示符合扫描条件的项目。';
+    } else {
+      $('loadNotice').textContent = failed ? '两个社区目录都未能载入。可以重试，或先浏览精选目录。' : '社区目录加载后将自动显示结果。';
+    }
     $('loadActions').hidden = !failed;
     $('onlineInfo').dataset.state = failed ? 'error' : 'loading';
     $('cards').innerHTML = $('pageInfo').textContent = '';
@@ -1007,7 +1043,7 @@ function render() {
   const curatedSearch = dataState.mode === 'curated' && dataState.search.trim();
   visibleProjects = batch;
   $('cards').innerHTML = batch.length ? batch.map(showCard).join('') : renderEmpty(facets, curatedSearch);
-  if (dataState.favoritesOnly && dataState.full && dataState.mode === 'full') {
+  if (dataState.favoritesOnly && dataState.scan === 'all' && dataState.full && dataState.mode === 'full') {
     const unresolved = unresolvedBookmarks();
     if (unresolved.length) {
       $('cards').innerHTML += '<aside class="legacy-bookmarks"><strong>旧收藏的仓库</strong><p>旧收藏只记录了仓库。可打开原仓库确认组件，再收藏具体项目。</p>'
@@ -1038,6 +1074,7 @@ function render() {
 function goPage(delta){changedView('push', dataState.page + delta);$('resultSummary').focus({preventScroll:true});$('resultSummary').scrollIntoView({block:'start'});}
 $('seedCount').textContent=CURATED.length;
 $('retryLoad').onclick = () => loadFull(true);
+$('retryScan').onclick = () => loadMarketScanSnapshot(true);
 $('browseCurated').onclick = () => { setMode('curated'); $('tabCurated').focus(); };
 $('tabCurated').onclick=()=>setMode('curated');$('tabFull').onclick=()=>setMode('full');
 $('search').oninput = event => {
@@ -1052,7 +1089,7 @@ $('search').oninput = event => {
 };
 $('search').onblur = () => { editingSearch = false; };
 $('clearSearch').onclick = clearSearch;
-for (const [id,key] of [['sort','sort'],['categorySelect','category'],['kindSelect','kind'],['installSelect','availability']]) {
+for (const [id,key] of [['sort','sort'],['categorySelect','category'],['kindSelect','kind'],['installSelect','availability'],['scanSelect','scan']]) {
   $(id).onchange = event => { flushSearch(); dataState[key] = event.target.value; changedView(); };
 }
 for (const [id,key] of [['onlyRecommended','recommended'],['onlyNative','native'],['onlyFavorites','favoritesOnly']]) {
