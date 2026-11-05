@@ -82,7 +82,6 @@
             </label>
           </div>
         </div>
-        <div id="activeFilters" class="active-filters" aria-label="已选条件"></div>
         <div id="onlineInfo" class="online" hidden>
           <p id="loadNotice"></p>
           <div id="loadActions" hidden>
@@ -825,7 +824,10 @@ function renderFacet(id, counts, selected, label) {
     + options.map(([name, n]) => `<option value="${esc(name)}">${esc(name)} · ${number(n)}</option>`).join('');
   $(id).value = selected;
 }
-function selectedFilters(){const selected=[];if(dataState.search.trim())selected.push(['search','搜索：'+dataState.search]);if(dataState.category!=='全部')selected.push(['category',dataState.category]);if(dataState.kind!=='全部')selected.push(['kind',dataState.kind]);if(dataState.availability!=='all')selected.push(['availability',{copyable:'有安装地址',manual:'需按说明安装',unverified:'地址未核实',broken:'索引标记失效',ecosystem:'非直接安装插件'}[dataState.availability]]);if(dataState.native)selected.push(['native','仅 DSH 插件']);if(dataState.recommended)selected.push(['recommended','优先体验']);if(dataState.favoritesOnly)selected.push(['favoritesOnly','我的收藏']);return selected;}
+const facetKeys = ['category','kind','availability','native','recommended','favoritesOnly'];
+function activeFacetCount() {
+  return facetKeys.filter(key => dataState[key] !== catalogViewDefaults[key]).length;
+}
 function filters(results) {
   renderFacet('categorySelect', results?.categories, dataState.category, '全部用途');
   renderFacet('kindSelect', results?.kinds, dataState.kind, '全部类型');
@@ -833,30 +835,20 @@ function filters(results) {
   $('installSelect').value=dataState.availability;
   $('onlyRecommended').checked=dataState.recommended;$('onlyNative').checked=dataState.native;$('onlyFavorites').checked=dataState.favoritesOnly;
   $('clearSearch').hidden=!$('search').value;
-  const selected=selectedFilters();
   $('autoSortLabel').textContent = dataState.search.trim() ? '匹配程度 · 默认' : '推荐优先 · 默认';
   $('sort').value = dataState.sort;
-  const facets = selected.filter(([key]) => key !== 'search');
-  $('filterCount').textContent = facets.length || '';
-  $('resetBtn').disabled = !selected.length && dataState.sort === 'auto';
-  $('activeFilters').innerHTML = facets.map(([key, label]) =>
-    `<button type="button" class="filter-chip" data-remove-filter="${key}" aria-label="移除筛选：${esc(label)}">${esc(label)}<span aria-hidden="true">×</span></button>`
-  ).join('');
-  $('activeFilters').querySelectorAll('[data-remove-filter]').forEach(button=>button.onclick=()=>removeFilter(button.dataset.removeFilter));
+  const count = activeFacetCount();
+  $('filterCount').textContent = count || '';
+  $('resetBtn').disabled = !count && !dataState.search.trim() && dataState.sort === 'auto';
 }
-function removeFilter(key) {
+function clearSearch() {
   flushSearch();
-  if(key==='search'){dataState.search='';$('search').value='';}
-  else if(key==='category'||key==='kind')dataState[key]='全部';
-  else if(key==='availability')dataState.availability='all';
-  else dataState[key]=false;
+  dataState.search = $('search').value = '';
   changedView();
-  const controls={search:'search',category:'categorySelect',kind:'kindSelect',availability:'installSelect',native:'onlyNative',recommended:'onlyRecommended',favoritesOnly:'onlyFavorites'};
-  const control = key !== 'search' && $('filtersRail').hidden ? $('filterSummary') : $(controls[key]);
-  control.focus({preventScroll:true});
+  $('search').focus({preventScroll:true});
 }
 function clearFacets() {
-  for (const key of ['category','kind','availability','native','recommended','favoritesOnly']) {
+  for (const key of facetKeys) {
     dataState[key] = catalogViewDefaults[key];
   }
 }
@@ -1011,7 +1003,7 @@ function render() {
   const matches = results.matches, pages = Math.max(1, Math.ceil(matches.length / PAGE_SIZE));
   dataState.page=Math.max(0,Math.min(dataState.page,pages-1));
   const start=dataState.page*PAGE_SIZE,batch=matches.slice(start,start+PAGE_SIZE);
-  const facets = selectedFilters().some(([key]) => key !== 'search');
+  const facets = activeFacetCount() > 0;
   const curatedSearch = dataState.mode === 'curated' && dataState.search.trim();
   visibleProjects = batch;
   $('cards').innerHTML = batch.length ? batch.map(showCard).join('') : renderEmpty(facets, curatedSearch);
@@ -1035,7 +1027,7 @@ function render() {
     if (curatedSearch) $('emptyFull').onclick = () => { setMode('full'); $('resultSummary').focus(); };
     $('emptyReset').onclick = () => {
       if (facets) { clearFacets(); changedView(); }
-      else removeFilter('search');
+      else clearSearch();
       $('search').focus({preventScroll:true});
     };
   }
@@ -1059,7 +1051,7 @@ $('search').oninput = event => {
   }, 130);
 };
 $('search').onblur = () => { editingSearch = false; };
-$('clearSearch').onclick = () => removeFilter('search');
+$('clearSearch').onclick = clearSearch;
 for (const [id,key] of [['sort','sort'],['categorySelect','category'],['kindSelect','kind'],['installSelect','availability']]) {
   $(id).onchange = event => { flushSearch(); dataState[key] = event.target.value; changedView(); };
 }
@@ -1102,7 +1094,7 @@ document.onkeydown = event => {
   if (event.isComposing || event.metaKey || event.ctrlKey || event.altKey) return;
   if (event.key === 'Escape' && event.target === $('search')) {
     event.preventDefault();
-    removeFilter('search');
+    clearSearch();
   } else if (event.key === '/' && !event.target.isContentEditable && !event.target.closest('input:not([type="checkbox"]), textarea, select')) {
     event.preventDefault();
     $('search').focus();
