@@ -52,7 +52,7 @@
             <label class="field"><span>用途</span><select id="categorySelect" aria-label="用途分类"><option value="全部">全部用途</option></select></label>
             <label class="field"><span>项目类型</span><select id="kindSelect"><option value="全部">全部类型</option></select></label>
             <label class="field"><span>安装状态</span><select id="installSelect">
-              <option value="all">全部安装状态</option><option value="copyable">有可复制地址</option><option value="manual">需按说明安装</option>
+              <option value="all">全部安装状态</option><option value="copyable">有安装地址</option><option value="manual">需按说明安装</option>
               <option value="unverified">地址未核实</option><option value="broken">索引标记失效</option><option value="ecosystem">非直接安装插件</option>
             </select></label>
             <div class="filter-toggles">
@@ -106,7 +106,7 @@
   <dialog class="guide-dialog" id="data-sources" aria-labelledby="source-heading">
     <div class="guide-heading"><h2 id="source-heading">数据来源与日期</h2><form method="dialog"><button class="close-guide" aria-label="关闭数据来源" autofocus>关闭</button></form></div>
     <div class="guide-grid">
-      <div><h3>项目来源</h3><p>展开「项目信息」可查看项目的 <a href="https://awesome-dsh-plugin.com/" target="_blank" rel="noopener noreferrer">awesome-dsh-plugin.com</a>、<a href="https://dsh.works/awesome-dsh-plugins/" target="_blank" rel="noopener noreferrer">dsh.works</a> 或 GitHub 来源。更多仓库可浏览 <a href="https://github.com/topics/dsh-plugin" target="_blank" rel="noopener noreferrer">GitHub Topic ↗</a>。</p></div>
+      <div><h3>项目来源</h3><p>每条结果底部都列出项目的 <a href="https://awesome-dsh-plugin.com/" target="_blank" rel="noopener noreferrer">awesome-dsh-plugin.com</a>、<a href="https://dsh.works/awesome-dsh-plugins/" target="_blank" rel="noopener noreferrer">dsh.works</a> 或 GitHub 来源。更多仓库可浏览 <a href="https://github.com/topics/dsh-plugin" target="_blank" rel="noopener noreferrer">GitHub Topic ↗</a>。</p></div>
       <div><h3>发布与更新</h3><p>发布是首次正式 GitHub Release，更新是仓库最后推送日期。日期按 UTC 显示；悬浮或聚焦可查看说明。</p></div>
       <div><h3>目录范围</h3><p>精选收录 117 个项目，其中 24 个标记为优先体验。社区全量按需读取远端索引，部分简介保留原文。</p></div>
     </div>
@@ -771,7 +771,7 @@ function renderFacet(id, counts, selected, label) {
     + options.map(([name, n]) => `<option value="${esc(name)}">${esc(name)} · ${number(n)}</option>`).join('');
   $(id).value = selected;
 }
-function selectedFilters(){const selected=[];if(dataState.search.trim())selected.push(['search','搜索：'+dataState.search]);if(dataState.category!=='全部')selected.push(['category',dataState.category]);if(dataState.kind!=='全部')selected.push(['kind',dataState.kind]);if(dataState.availability!=='all')selected.push(['availability',{copyable:'有可复制地址',manual:'需按说明安装',unverified:'地址未核实',broken:'索引标记失效',ecosystem:'非直接安装插件'}[dataState.availability]]);if(dataState.native)selected.push(['native','仅 DSH 插件']);if(dataState.recommended)selected.push(['recommended','优先体验']);if(dataState.favoritesOnly)selected.push(['favoritesOnly','我的收藏']);return selected;}
+function selectedFilters(){const selected=[];if(dataState.search.trim())selected.push(['search','搜索：'+dataState.search]);if(dataState.category!=='全部')selected.push(['category',dataState.category]);if(dataState.kind!=='全部')selected.push(['kind',dataState.kind]);if(dataState.availability!=='all')selected.push(['availability',{copyable:'有安装地址',manual:'需按说明安装',unverified:'地址未核实',broken:'索引标记失效',ecosystem:'非直接安装插件'}[dataState.availability]]);if(dataState.native)selected.push(['native','仅 DSH 插件']);if(dataState.recommended)selected.push(['recommended','优先体验']);if(dataState.favoritesOnly)selected.push(['favoritesOnly','我的收藏']);return selected;}
 function filters(results) {
   renderFacet('categorySelect', results?.categories, dataState.category, '全部用途');
   renderFacet('kindSelect', results?.kinds, dataState.kind, '全部类型');
@@ -816,16 +816,34 @@ function resetFilters() {
   changedView();
 }
 function renderInstall(p) {
-  const info=getInstallInfo(p),url=githubLink(p);
-  const rows=info.options.map(option=>{
-    const name=p.name+(info.options.length>1?' '+option.label:'');
-    return '<div class="install-box">'+(info.options.length>1?'<span class="install-label">'+esc(option.label)+'</span>':'')+'<div class="install-row"><input class="install-address" readonly aria-label="'+esc(name)+' 的 DSH 安装地址" value="'+esc(option.spec)+'"><button class="copy-install" type="button" data-copy-install data-install-name="'+esc(name)+'" aria-label="复制地址：'+esc(name)+'">复制地址</button></div><p class="install-feedback" role="status" aria-live="polite"></p></div>';
+  const info = getInstallInfo(p);
+  const note = info.note ? `<p class="install-note">${esc(info.note)}</p>` : '';
+  if (!info.options.length) {
+    const url = githubLink(p);
+    const next = url ? `<a class="install-next" href="${esc(url)}#readme" target="_blank" rel="noopener noreferrer">查看${info.state === 'ecosystem' ? '项目' : '安装'}说明 ↗</a>` : '';
+    return `<div class="install-section install-notice"><span class="install-state ${info.state}">${esc(info.label)}</span>${note}${next}</div>`;
+  }
+  const multiple = info.options.length > 1;
+  const rows = info.options.map(option => {
+    const name = esc(multiple ? p.name + ' ' + option.label : p.name);
+    return `<div class="install-box">
+      ${multiple ? `<span class="install-label">${esc(option.label)}</span>` : ''}
+      <div class="install-row">
+        <input class="install-address" readonly aria-label="${name} 的 DSH 安装地址" value="${esc(option.spec)}">
+        <button class="copy-install" type="button" data-copy-install data-install-name="${name}" aria-label="复制地址：${name}">复制地址</button>
+      </div>
+      <p class="install-feedback" role="status" aria-live="polite"></p>
+    </div>`;
   }).join('');
-  return '<div class="install-section"><div class="install-heading"><span class="install-state '+info.state+'">'+(info.state==='copyable'?'✓ ':'')+info.label+'</span>'+'</div>'+rows+(info.note?'<p class="install-note">'+esc(info.note)+'</p>':'')+(!info.options.length&&url?'<a class="install-next" href="'+esc(url)+'#readme" target="_blank" rel="noopener noreferrer">查看'+(info.state==='ecosystem'?'项目':'安装')+'说明 ↗</a>':'')+'</div>';
+  return `<div class="install-section">${rows}${note}</div>`;
 }
 function renderProjectSource(p) {
-  const links=p.source==='社区索引'?[{url:'https://dsh.works/awesome-dsh-plugins/',label:'dsh.works'}]:SOURCE_CATALOG[String(p.repo).toLowerCase()]||[{url:githubLink(p),label:'github.com'}];
-  return '<div class="card-source"><span>来源</span>'+links.filter(x=>x.url).map(x=>'<a href="'+esc(x.url)+'" target="_blank" rel="noopener noreferrer">'+esc(x.label)+' ↗</a>').join('')+'</div>';
+  const links = p.source === '社区索引' ? [{url:'https://dsh.works/awesome-dsh-plugins/',label:'dsh.works'}]
+    : SOURCE_CATALOG[String(p.repo).toLowerCase()] || [{url:githubLink(p),label:'github.com'}];
+  const sources = links.filter(link => link.url).map(link =>
+    `<a href="${esc(link.url)}" target="_blank" rel="noopener noreferrer">${esc(link.label)} ↗</a>`
+  ).join('');
+  return sources ? `<span class="card-source"><span>来源</span>${sources}</span>` : '';
 }
 function highlightText(text, query) {
   const {pattern} = catalogQuery(query);
@@ -859,10 +877,7 @@ function showCard(p) {
         ${renderInstall(p)}
       </div>
     </div>
-    <details class="record-details">
-      <summary>项目信息</summary>
-      <div class="record-facts">${renderProjectSource(p)}${renderProjectDates(p)}</div>
-    </details>
+    <footer class="record-facts">${renderProjectSource(p)}${renderProjectDates(p)}</footer>
   </article>`;
 }
 function renderEmpty(facets, curatedSearch) {
