@@ -51,7 +51,7 @@
           <div class="filter-body">
             <label class="field"><span>用途</span><select id="categorySelect" aria-label="用途分类"><option value="全部">全部用途</option></select></label>
             <label class="field"><span>项目类型</span><select id="kindSelect"><option value="全部">全部类型</option></select></label>
-            <label class="field"><span>安装状态</span><select id="installSelect">
+            <label class="field"><span id="installStatusLabel">安装状态</span><select id="installSelect" aria-labelledby="installStatusLabel">
               <option value="all">全部安装状态</option><option value="copyable">有安装地址</option><option value="manual">需按说明安装</option>
               <option value="unverified">地址未核实</option><option value="broken">索引标记失效</option><option value="ecosystem">非直接安装插件</option>
             </select></label>
@@ -70,7 +70,6 @@
           <h2 id="resultSummary" tabindex="-1" aria-live="polite" aria-atomic="true">项目列表</h2>
           <div class="result-tools">
             <button class="filter-title" id="filterSummary" type="button" aria-expanded="true" aria-controls="filtersRail">筛选 <span id="filterCount"></span></button>
-            <button type="button" id="quickCopy" aria-pressed="false" title="只看有可复制安装地址的项目">有安装地址</button>
             <label class="sort-field"><span>排序</span>
             <select id="sort" aria-label="项目排序">
               <option value="auto" id="autoSortLabel">推荐优先 · 默认</option>
@@ -775,7 +774,6 @@ function selectedFilters(){const selected=[];if(dataState.search.trim())selected
 function filters(results) {
   renderFacet('categorySelect', results?.categories, dataState.category, '全部用途');
   renderFacet('kindSelect', results?.kinds, dataState.kind, '全部类型');
-  $('quickCopy').setAttribute('aria-pressed', String(dataState.availability === 'copyable'));
   $('showResults').textContent = results ? '查看 ' + number(results.matches.length) + ' 个结果' : '查看状态';
   $('installSelect').value=dataState.availability;
   $('onlyRecommended').checked=dataState.recommended;$('onlyNative').checked=dataState.native;$('onlyFavorites').checked=dataState.favoritesOnly;
@@ -1015,11 +1013,7 @@ $('filtersRail').onkeydown = event => {
     $('filterSummary').focus();
   }
 };
-$('quickCopy').onclick = () => {
-  flushSearch();
-  dataState.availability = dataState.availability === 'copyable' ? 'all' : 'copyable';
-  changedView();
-};
+
 document.onkeydown = event => {
   if (event.isComposing || event.metaKey || event.ctrlKey || event.altKey) return;
   if (event.key === 'Escape' && event.target === $('search')) {
