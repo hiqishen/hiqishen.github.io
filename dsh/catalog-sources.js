@@ -48,8 +48,34 @@ function declaredSpec(item, location) {
   return item.npm === 0 && /^[\w.@/-]*$/.test(location.path) && spec === expected ? spec : '';
 }
 
-function readAwesomeCatalog(catalogJson, canonicalItemList) {
-  if (!Array.isArray(catalogJson?.items) || canonicalItemList?.['@type'] !== 'ItemList' || !Array.isArray(canonicalItemList.itemListElement)) return [];
+function descriptionText(value) {
+  if (typeof value !== 'string') return '';
+  const text = value.trim();
+  if (!text || !/[\p{L}\p{N}]/u.test(text) || /^(?:n\/?a|none|null|undefined|unknown|no description(?: provided| available)?\.?|暂无(?:简介|描述)|未提供(?:简介|描述)|项目未提供简介，请打开仓库查看 README。)$/i.test(text)) return '';
+  return text;
+}
+
+function chineseDescriptionScore(text) {
+  const han = (text.match(/\p{Script=Han}/gu) || []).length;
+  const kana = (text.match(/[\p{Script=Hiragana}\p{Script=Katakana}]/gu) || []).length;
+  const latin = (text.match(/[a-z]/gi) || []).length;
+  if (han < 2 || kana > han * 0.15) return 0;
+  return han + Math.min(latin / 8, han);
+}
+
+function chooseCatalogDescription(...texts) {
+  const descriptions = texts.map(descriptionText).filter(Boolean);
+  let chosen = descriptions[0] || '';
+  let best = chineseDescriptionScore(chosen);
+  for (const text of descriptions.slice(1)) {
+    const score = chineseDescriptionScore(text);
+    if (score > best) { chosen = text; best = score; }
+  }
+  return chosen;
+}
+
+function readAwesomeCatalog(catalogJson, canonicalItemList, locale = 'en') {
+  if (!['en', 'zh'].includes(locale) || !Array.isArray(catalogJson?.items) || canonicalItemList?.['@type'] !== 'ItemList' || !Array.isArray(canonicalItemList.itemListElement)) return [];
   const canonical = new Map();
   for (const entry of canonicalItemList.itemListElement) {
     const location = canonicalLocation(entry?.url);
@@ -64,7 +90,7 @@ function readAwesomeCatalog(catalogJson, canonicalItemList) {
     if (!item || typeof item.slug !== 'string' || typeof item.owner !== 'string') continue;
     const location = canonical.get(item.slug.toLowerCase());
     if (!location || item.owner.toLowerCase() !== location.repo.split('/')[0].toLowerCase() || item.slug.toLowerCase() !== location.slug.toLowerCase()) continue;
-    const href = '/p/' + item.slug + '/';
+    const href = (locale === 'zh' ? '/zh/p/' : '/p/') + item.slug + '/';
     if (item.href !== href || seen.has(item.slug.toLowerCase())) continue;
     seen.add(item.slug.toLowerCase());
     const category = item.cat === 'skill' ? 'skill' : item.cat === 'theme' ? 'theme' : 'plugin';
@@ -78,6 +104,12 @@ function readAwesomeCatalog(catalogJson, canonicalItemList) {
     };
     const spec = declaredSpec(item, location);
     if (category !== 'skill' && spec) record.awesomeInstallSpec = spec;
+    const description = descriptionText(item.desc);
+    if (description) {
+      record.awesomeDescription = description;
+      record.awesomeDescriptionLocale = locale;
+      record.awesomeDescriptionSource = AWESOME + href;
+    }
     result.push(record);
   }
   return result;
@@ -93,15 +125,34 @@ function installReference(record) { return npmSpec(record.npm) || npmSpec(record
 function awesomeLinks(record) {
   const location = identity(record);
   if (!location) return [];
-  const expected = '/p/' + record.repo + (location.path ? '--' + location.path.replaceAll('/', '-') : '') + '/';
+  const expectedSlug = record.repo.split('/')[1] + (location.path ? '--' + location.path.replaceAll('/', '-') : '');
   return (Array.isArray(record.catalogLinks) ? record.catalogLinks : []).filter(link => {
-    try { const url = new URL(link?.url); return url.origin === AWESOME && !url.username && !url.password && !url.search && !url.hash && decodeURI(url.pathname).toLowerCase() === decodeURI(expected).toLowerCase(); } catch { return false; }
+    try {
+      if (typeof link?.url !== 'string' || !link.url.startsWith(AWESOME + '/')) return false;
+      const url = new URL(link.url);
+      const match = /^https:\/\/awesome-dsh-plugin\.com\/(?:zh\/)?p\/([^/]+)\/([^/]+)\/$/.exec(link.url);
+      if (!match || url.origin !== AWESOME || url.username || url.password || url.search || url.hash) return false;
+      const segments = match.slice(1).map(part => decodeURIComponent(part));
+      if (segments.some(part => /[\\/?#\u0000-\u001f\u007f]/.test(part) || /%[a-f0-9]{2}/i.test(part) || ['.', '..'].includes(part))) return false;
+      return segments[0].toLowerCase() === record.repo.split('/')[0].toLowerCase() && segments[1] === expectedSlug;
+    } catch { return false; }
   }).map(link => ({url:link.url,label:'awesome-dsh-plugin.com'}));
+}
+
+function keepAwesomeDescription(target, record, links) {
+  const description = descriptionText(record.description);
+  const selected = chooseCatalogDescription(target.awesomeDescription, description);
+  if (description && selected === description) {
+    target.awesomeDescription = description;
+    const source = links.find(link => link.url === record.awesomeDescriptionSource) || links[0];
+    target.awesomeDescriptionLocale = source.url.startsWith(AWESOME + '/zh/p/') ? 'zh' : 'en';
+    target.awesomeDescriptionSource = source.url;
+  }
 }
 
 function mergeCommunityCatalogs(dshRaw, awesomeRaw) {
   const primary = records(dshRaw).filter(record => record && typeof record === 'object').map(record => {
-    const {awesomeInstallSpec, catalogLinks, ...rest} = record;
+    const {awesomeInstallSpec, awesomeDescription, awesomeDescriptionLocale, awesomeDescriptionSource, catalogLinks, ...rest} = record;
     return {...rest,catalogLinks:[{...PRIMARY_LINK}]};
   });
   const secondary = records(awesomeRaw);
@@ -139,8 +190,11 @@ function mergeCommunityCatalogs(dshRaw, awesomeRaw) {
     }
     if (match) {
       match.catalogLinks.push(...links.filter(link => !match.catalogLinks.some(existing => existing.url === link.url)));
+      keepAwesomeDescription(match, record, links);
     } else if (!exact.has(id.key)) {
-      const addition = {...record,catalogLinks:links};
+      const {awesomeDescription, awesomeDescriptionLocale, awesomeDescriptionSource, ...rest} = record;
+      const addition = {...rest,catalogLinks:links};
+      keepAwesomeDescription(addition, record, links);
       primary.push(addition);
       exact.set(id.key, addition);
       if (!byRepo.has(id.repo)) byRepo.set(id.repo, []);

@@ -25,7 +25,7 @@ function projectFields(project) {
       repo, path, owner: slash < 0 ? '' : repo.slice(0, slash),
       ids: [repo.slice(slash + 1), path, project.installRecord?.npm].filter(Boolean).map(identifierField),
       labels: [project.category, project.kind, ...(project.tags || [])].map(foldSearch),
-      desc: foldSearch(project.desc)
+      desc: [project.desc, ...(project.descAliases || [])].map(foldSearch).join('\0')
     };
     catalogFields.set(project, fields);
   }
