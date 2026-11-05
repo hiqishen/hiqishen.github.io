@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 152" fill="none">
+  <defs>
+    <pattern id="grid" width="22" height="22" patternUnits="userSpaceOnUse"><path d="M0 22V0h22" stroke="#53665b" stroke-width=".6"/></pattern>
+    <path id="ridge" d="M-121-7c11-26 40-18 57-37 14-15 20-24 43-18 27 7 35 27 61 26 27-1 38-24 59-13 17 9 6 28 19 40 13 13 28 28 16 41-10 11-35 5-51 12-22 10-32 24-54 18C0 54-8 36-34 43c-25 7-42 12-58-2-16-15-43-28-29-48Z"/>
+    <clipPath id="frame"><rect x="4" y="5" width="352" height="140"/></clipPath>
+  </defs>
+  <g clip-path="url(#frame)">
+    <path fill="url(#grid)" d="M4 5h352v140H4z"/>
+    <g transform="translate(180 74) rotate(-12)" stroke="#a9bc9e">
+      <use href="#ridge" transform="scale(1.64)" stroke-width=".6"/>
+      <use href="#ridge" transform="scale(1.46)" stroke-width=".65"/>
+      <use href="#ridge" transform="scale(1.28)" stroke-width=".75"/>
+      <use href="#ridge" transform="scale(1.09)" stroke-width="1.15"/>
+      <use href="#ridge" transform="scale(.89)"/>
+      <use href="#ridge" transform="scale(.70)" stroke-width="1.25"/>
+      <use href="#ridge" transform="scale(.51)" stroke-width="1.7"/>
+      <use href="#ridge" transform="scale(.33)" stroke-width="2.8"/>
+    </g>
+    <path d="m39 117 45-9 25-31 40 10 31-45 43 11 31-25" stroke="#ff956a" stroke-width="2" stroke-dasharray="4 3" stroke-linejoin="round"/>
+    <g fill="#1b302a" stroke="#ff956a" stroke-width="2"><circle cx="39" cy="117" r="4"/><circle cx="149" cy="87" r="4"/><circle cx="180" cy="42" r="4"/></g>
+    <path d="M254 29V10l14 4-14 5" fill="#ff956a" stroke="#ff956a" stroke-linejoin="round"/>
+  </g>
+  <path d="M4 17V5h12m328 0h12v12M4 133v12h12m328 0h12v-12" stroke="#c3cdb9" stroke-width="1"/>
+</svg>
