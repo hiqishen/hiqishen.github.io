@@ -55,7 +55,7 @@ function marketScanSlot(project, index) {
   const summary = marketReportLabels.get(report.status) + ' · ' + revision;
   const href = 'https://dsh-plugin.market/plugin/' + report.repo;
   const tipId = 'market-tip-' + encodeURIComponent(report.repo);
-  return '<span class="market-scan"><span>第三方扫描</span> <a href="' + href
+  return '<span class="market-scan"><a href="' + href
     + '" target="_blank" rel="noopener noreferrer" data-status="' + report.status
     + '" aria-label="' + esc('DSH Plugin Market 扫描报告：' + summary) + '" aria-describedby="' + tipId
     + '">' + esc(summary) + ' ↗</a>'
