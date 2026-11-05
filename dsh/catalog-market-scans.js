@@ -25,6 +25,7 @@ function marketScanIndex(snapshot) {
     // 一个仓库出现两份不同记录时，不选择其中任意一份作为当前报告。
     reports.set(key, reports.has(key) ? null : {repo,status,version,sha,packageName});
   }
+  if (snapshot.rows.length && !reports.size) throw new Error('报告摘要没有可读取的记录');
   return reports;
 }
 
@@ -47,22 +48,37 @@ function marketScanFor(project, index) {
   return report;
 }
 
+function marketScanTooltip(id, title, meaning, sha = '') {
+  const commit = sha ? '<br>扫描提交 · ' + sha.slice(0, 8) : '';
+  return '<span class="market-scan-tooltip" id="' + id + '" role="tooltip"><span class="scan-tip-body">'
+    + '<strong>' + title + '</strong><span>' + meaning + '</span>'
+    + '<small>来源 · DSH Plugin Market' + commit + '</small></span></span>';
+}
+
+let marketTipSequence = 0;
 function marketScanSlot(project, index) {
-  if (!marketScanEligible(project)) return '';
+  if (!index) return '<span class="market-scan" hidden></span>';
   const report = marketScanFor(project, index);
-  if (!report) return '<span class="market-scan" hidden></span>';
+  const tipId = 'market-tip-' + (++marketTipSequence);
+  if (!report) {
+    let meaning = '当前扫描摘要中没有与这个项目匹配的报告。';
+    if (project.componentPath || /\/tree\/[^/]+\/.+/.test(project.url || '')) {
+      meaning = '扫描方按仓库根项目出具报告，当前摘要中没有单独对应这个子组件的报告。';
+    } else if (typeof project.repo === 'string' && index.has(project.repo.toLowerCase())) {
+      meaning = '当前摘要中有同仓库的记录，但无法确认报告对应这个项目。';
+    }
+    return '<span class="market-scan"><span class="scan-missing" tabindex="0" aria-describedby="' + tipId + '">未扫描</span>'
+      + marketScanTooltip(tipId, '未扫描', meaning) + '</span>';
+  }
   const revision = report.version ? report.version.replace(/^v?/i, 'v') : report.sha.slice(0, 8);
   const summary = marketReportLabels.get(report.status) + ' · ' + revision;
   const href = 'https://dsh-plugin.market/plugin/' + report.repo;
-  const tipId = 'market-tip-' + encodeURIComponent(report.repo);
   return '<span class="market-scan"><a href="' + href
     + '" target="_blank" rel="noopener noreferrer" data-status="' + report.status
     + '" aria-label="' + esc('DSH Plugin Market 扫描报告：' + summary) + '" aria-describedby="' + tipId
     + '">' + esc(summary) + ' ↗</a>'
-    + '<span class="market-scan-tooltip" id="' + tipId + '" role="tooltip"><span class="scan-tip-body">'
-    + '<strong>' + marketReportLabels.get(report.status) + ' · ' + report.status + '</strong>'
-    + '<span>' + marketReportMeanings[report.status] + '</span>'
-    + '<small>来源 · DSH Plugin Market<br>扫描提交 · ' + report.sha.slice(0, 8) + '</small></span></span></span>';
+    + marketScanTooltip(tipId, marketReportLabels.get(report.status) + ' · ' + report.status, marketReportMeanings[report.status], report.sha)
+    + '</span>';
 }
 
 function bindMarketScanTooltips(cards) {

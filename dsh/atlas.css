@@ -144,6 +144,7 @@ mark { padding: 0 1px; color: var(--ink); background: #f3dfb8; }
 .record-facts { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 18px; margin-top: 12px; font-size: 12px; color: var(--muted); }
 .card-source { display: flex; align-items: baseline; flex-wrap: wrap; gap: 5px 10px; }
 .market-scan { position: relative; display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.scan-missing { color: var(--muted); cursor: help; text-decoration: underline dotted var(--line); text-underline-offset: 3px; }
 .market-scan a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; overflow-wrap: anywhere; }
 .market-scan a[data-status="REVIEW"], .market-scan a[data-status="FAILED"] { color: var(--accent); }
 .market-scan-tooltip { position: absolute; z-index: 3; left: 0; bottom: 100%; display: none; width: min(260px, calc(100vw - 16px)); padding-bottom: 5px; }
