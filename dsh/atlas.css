@@ -231,6 +231,7 @@ mark { padding: 0 1px; color: var(--ink); background: #f3dfb8; }
   .tab { font-size: 13px; min-height: 40px; padding-bottom: 9px; }
   .tab-count, .tab b { font-size: 12px; }
   .scope-help { display: none; }
+  .scope-help[data-mode="full"] { display: block; margin: 5px 0 0; }
   .searchbox { min-height: 45px; gap: 9px; padding-inline: 12px; }
   .searchbox input { font-size: 14px; }
   .searchbox kbd { display: none; }
