@@ -61,6 +61,12 @@
             <label class="field"><span>第三方扫描</span><select id="scanSelect">
               <option value="all">全部扫描状态</option><option value="reported">有扫描报告</option><option value="review">需复核</option>
             </select></label>
+            <div class="field">
+              <label for="minStars">最低 Stars</label>
+              <input type="number" id="minStars" min="0" step="1" inputmode="numeric" placeholder="不限" aria-describedby="minStarsHint minStarsError">
+              <p id="minStarsHint" class="field-hint">留空或 0 表示不限</p>
+              <p id="minStarsError" class="field-error" role="status" hidden></p>
+            </div>
             <div class="filter-toggles">
               <label class="checkline"><input type="checkbox" id="onlyNative">仅 DSH 插件</label>
               <label class="checkline"><input type="checkbox" id="onlyRecommended">优先体验</label>
@@ -85,6 +91,7 @@
             </label>
           </div>
         </div>
+        <button type="button" class="active-filter" id="clearMinStars" hidden></button>
         <div id="onlineInfo" class="online" hidden>
           <p id="loadNotice"></p>
           <div id="loadActions" hidden>
@@ -672,6 +679,7 @@ function restoreView() {
   searchDraft = searchComposing = false;
   Object.assign(dataState, readCatalogView(window.location.href));
   syncPageSize();
+  syncMinStars();
   if ($('search').value !== dataState.search) $('search').value = dataState.search;
   const full = dataState.mode === 'full';
   dataState.all = full ? (dataState.full || []) : CURATED;
@@ -815,6 +823,7 @@ function catalogResults() {
   const query = catalogQuery(dataState.search);
   const matches = [], categories = new Map(), kinds = new Map();
   for (const project of dataState.all) {
+    if (dataState.minStars > 0 && !(project.stars >= dataState.minStars)) continue;
     if (dataState.native && !isNative(project)) continue;
     if (dataState.recommended && project.score < 2) continue;
     if (dataState.favoritesOnly && !isFavorite(project)) continue;
@@ -852,7 +861,7 @@ function renderFacet(id, counts, selected, label) {
     + options.map(([name, n]) => `<option value="${esc(name)}">${esc(name)} · ${number(n)}</option>`).join('');
   $(id).value = selected;
 }
-const facetKeys = ['category','kind','availability','scan','native','recommended','favoritesOnly'];
+const facetKeys = ['category','kind','availability','scan','minStars','native','recommended','favoritesOnly'];
 function activeFacetCount() {
   return facetKeys.filter(key => dataState[key] !== catalogViewDefaults[key]).length;
 }
@@ -862,6 +871,10 @@ function filters(results) {
   $('showResults').textContent = results ? '查看 ' + number(results.matches.length) + ' 个结果' : '查看状态';
   $('installSelect').value=dataState.availability;
   $('scanSelect').value=dataState.scan;
+  if (document.activeElement !== $('minStars')) syncMinStars();
+  $('clearMinStars').hidden = !dataState.minStars;
+  $('clearMinStars').textContent = 'Stars ≥ ' + number(dataState.minStars) + ' ×';
+  $('clearMinStars').setAttribute('aria-label', '移除最低 Stars 筛选：' + number(dataState.minStars));
   $('onlyRecommended').checked=dataState.recommended;$('onlyNative').checked=dataState.native;$('onlyFavorites').checked=dataState.favoritesOnly;
   $('clearSearch').hidden=!$('search').value;
   $('autoSortLabel').textContent = dataState.search.trim() ? '匹配程度 · 默认' : '推荐优先 · 默认';
@@ -880,6 +893,7 @@ function clearFacets() {
   for (const key of facetKeys) {
     dataState[key] = catalogViewDefaults[key];
   }
+  syncMinStars();
 }
 function resetFilters() {
   flushSearch();
@@ -1109,6 +1123,47 @@ function syncPageSize() {
   $('pageSize').value = String(dataState.pageSize);
   $('pageSizeError').hidden = true;
 }
+function syncMinStars() {
+  $('minStars').value = dataState.minStars ? String(dataState.minStars) : '';
+  $('minStarsError').hidden = true;
+  $('minStars').removeAttribute('aria-invalid');
+}
+function applyMinStars() {
+  const stars = $('minStars').validity?.badInput ? null : parseMinStars($('minStars').value);
+  if (stars === null) {
+    syncMinStars();
+    $('minStarsError').textContent = '请输入 0–' + Number.MAX_SAFE_INTEGER + ' 之间的整数，或留空。';
+    $('minStarsError').hidden = false;
+    $('minStars').setAttribute('aria-invalid', 'true');
+    return;
+  }
+  if (stars !== dataState.minStars) {
+    flushSearch();
+    dataState.minStars = stars;
+    changedView();
+  }
+  syncMinStars();
+}
+$('minStars').max = String(Number.MAX_SAFE_INTEGER);
+syncMinStars();
+$('minStars').onblur = applyMinStars;
+$('minStars').oninput = () => {
+  $('minStarsError').hidden = true;
+  $('minStars').removeAttribute('aria-invalid');
+};
+$('minStars').onkeydown = event => {
+  if (event.key === 'Enter' && !event.isComposing && event.keyCode !== 229) {
+    event.preventDefault();
+    applyMinStars();
+  }
+};
+$('clearMinStars').onclick = () => {
+  flushSearch();
+  dataState.minStars = 0;
+  syncMinStars();
+  changedView();
+  $('minStars').focus({preventScroll:true});
+};
 function applyPageSize() {
   const size = parsePageSize($('pageSize').value);
   if (size === null) {

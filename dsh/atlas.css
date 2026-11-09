@@ -78,8 +78,11 @@ mark { padding: 0 1px; color: var(--ink); background: #f3dfb8; }
 .rail-title { margin: 0 0 14px; padding: 4px 0 10px; border-bottom: 1px solid var(--line); font-size: 14px; font-weight: 650; }
 .filter-body { display: grid; gap: 16px; }
 .field { display: grid; gap: 7px; min-width: 0; }
-.field > span { color: #595f55; font-size: 12px; }
-.field select { min-width: 0; width: 100%; min-height: 38px; padding: 7px 26px 7px 10px; background-color: var(--surface); border: 1px solid var(--line); border-radius: 3px; font-size: 12px; }
+.field > span, .field > label { color: #595f55; font-size: 12px; }
+.field select, .field input { min-width: 0; width: 100%; min-height: 38px; padding: 7px 26px 7px 10px; background-color: var(--surface); border: 1px solid var(--line); border-radius: 3px; font-size: 12px; }
+.field-hint, .field-error { margin: 0; font-size: 11px; color: var(--muted); }
+.field-error { color: var(--accent); }
+.active-filter { margin-bottom: 14px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); color: var(--ink); font-size: 12px; }
 .checkline { display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; }
 .checkline input { flex-shrink: 0; width: 14px; height: 14px; margin: 0; accent-color: var(--accent); }
 .filter-toggles { display: grid; gap: 13px; border-top: 1px solid var(--line); padding-top: 19px; }
@@ -244,7 +247,7 @@ mark { padding: 0 1px; color: var(--ink); background: #f3dfb8; }
   .searchbox { min-height: 45px; gap: 9px; padding-inline: 12px; }
   .searchbox input { font-size: 14px; }
   .searchbox kbd { display: none; }
-  .catalog-layout { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "tools" "filters" "online" "legacy" "cards" "bottom"; gap: 0; padding-top: 8px; }
+  .catalog-layout { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "tools" "filters" "active" "online" "legacy" "cards" "bottom"; gap: 0; padding-top: 8px; }
   .results-panel { display: contents; }
   #filtersRail { grid-area: filters; min-width: 0; }
   .rail-title { display: none; }
@@ -253,7 +256,7 @@ mark { padding: 0 1px; color: var(--ink); background: #f3dfb8; }
   .filter-title[aria-expanded="true"] { color: var(--accent); border-color: #dfd3c9; background: var(--accent-soft); }
   .filter-body { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 15px; padding-bottom: 18px; }
   .field { gap: 5px; }
-  .field select { min-height: 40px; }
+  .field select, .field input { min-height: 40px; }
   .filter-toggles { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 13px 20px; padding-top: 13px; }
   .checkline { min-height: 40px; font-size: 12px; }
   .show-results { display: inline-block; justify-self: end; min-height: 40px; padding: 7px 12px; border: none; border-radius: 3px; background: var(--map-ink); color: var(--paper); font-size: 12px; }
@@ -266,6 +269,7 @@ mark { padding: 0 1px; color: var(--ink); background: #f3dfb8; }
   .sort-field > span { display: none; }
   .sort-field select { max-width: 104px; font-size: 11px; padding-right: 10px; }
   .online { grid-area: online; }
+  .active-filter { grid-area: active; justify-self: start; min-height: 40px; }
   .legacy-bookmarks { grid-area: legacy; }
   .cards { grid-area: cards; }
   .card { position: relative; padding: 18px 0 13px; }
