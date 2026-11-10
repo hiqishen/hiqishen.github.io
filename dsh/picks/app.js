@@ -781,7 +781,7 @@ function showCopyFallback(value) {
     btn("完成", "primary", () => dialog.close()),
   );
   dialog.addEventListener("close", () => dialog.remove());
-  document.body.append(dialog);
+  main.append(dialog);
   dialog.showModal();
   text.focus();
   text.select();
