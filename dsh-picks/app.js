@@ -1,5 +1,5 @@
 import { plugins as curated, editions } from "./data.js?v=4";
-import { loadCatalog } from "./catalog.js";
+import { loadCatalog } from "./catalog.js?v=5";
 import { filterCatalog, readPreference, writePreference } from "./library.js";
 let plugins = curated;
 const curatedIds = new Set(curated.map((p) => p.id));
@@ -8,6 +8,7 @@ let scanStatuses,
   scanFailure = false;
 let searchWorker;
 let catalogReady = () => {};
+let loadingCatalog = false;
 const searches = new Map();
 let searchSequence = 0;
 try {
@@ -46,7 +47,7 @@ async function findPlugins(query, options) {
   const byId = new Map(plugins.map((p) => [p.id, p]));
   return result.map((id) => byId.get(id)).filter(Boolean);
 }
-import { getScan, getScanStatuses } from "./scan.js";
+import { getScan, getScanStatuses } from "./scan.js?v=5";
 import { searchPlugins, loadSubmissions, saveSubmission } from "./flows.js";
 
 const main = document.querySelector("#main");
@@ -670,23 +671,55 @@ function search() {
   );
   main.append(filters);
   const dataNote = el("div", "catalog-note");
-  if (catalogState.loading)
-    dataNote.append(el("p", "", "正在读取全部目录，先浏览已整理的推荐…"));
-  else if (catalogState.warnings.length) {
-    dataNote.append(
-      el("p", "", catalogState.warnings.join(" ")),
-      btn("重新读取", "text-link", refreshCatalog),
-    );
-  } else
-    dataNote.append(
-      el(
-        "p",
-        "",
-        plugins.length.toLocaleString("zh-CN") +
-          " 个收录条目 · 目录更新 " +
-          date(catalogState.fetchedAt),
-      ),
-    );
+  function updateCatalogNote() {
+    dataNote.replaceChildren();
+    if (catalogState.loading) {
+      const progress = catalogState.total
+        ? "正在载入目录 · " +
+          catalogState.loaded.toLocaleString("zh-CN") +
+          " / " +
+          catalogState.total.toLocaleString("zh-CN") +
+          "，可先搜索已载入条目。"
+        : "正在读取目录，先浏览已整理的推荐…";
+      dataNote.append(el("p", "", progress));
+    } else if (catalogState.warnings.length) {
+      dataNote.append(
+        el("p", "", catalogState.warnings.join(" ")),
+        btn("重新读取", "text-link", refreshCatalog),
+      );
+    } else
+      dataNote.append(
+        el(
+          "p",
+          "",
+          plugins.length.toLocaleString("zh-CN") +
+            " 个收录条目 · 目录更新 " +
+            date(catalogState.fetchedAt),
+        ),
+      );
+    for (const name of ["category", "kind"]) {
+      const select = grid.querySelector("select[name=" + name + "]");
+      const values = [
+        ...new Set(
+          plugins.map(
+            (p) => p[name] || (name === "kind" ? "DSH 插件" : "其他"),
+          ),
+        ),
+      ].sort();
+      const current = params.get(name) || "";
+      select.replaceChildren();
+      const blank = el("option", "", name === "kind" ? "全部类型" : "全部用途");
+      blank.value = "";
+      select.append(blank);
+      for (const value of values) {
+        const o = el("option", "", value);
+        o.value = value;
+        select.append(o);
+      }
+      select.value = current;
+    }
+  }
+  updateCatalogNote();
   main.append(dataNote);
   const results = el("section");
   results.setAttribute("aria-live", "polite");
@@ -782,6 +815,8 @@ function search() {
   let composing = false;
   input.addEventListener("compositionstart", () => {
     composing = true;
+    clearTimeout(searchTimer);
+    requestNumber++;
   });
   input.addEventListener("compositionend", () => {
     composing = false;
@@ -798,7 +833,7 @@ function search() {
       clearTimeout(searchTimer);
       apply();
     }
-    if (e.key === "Escape") {
+    if (e.key === "Escape" && !composing) {
       input.value = "";
       apply();
     }
@@ -806,6 +841,10 @@ function search() {
   input.addEventListener("change", () => {
     if (!composing) apply();
   });
+  catalogReady = () => {
+    updateCatalogNote();
+    if (!composing) renderResults();
+  };
   renderResults();
 }
 
@@ -1475,23 +1514,50 @@ async function refreshScans() {
     scanFailure = true;
     scanStatuses = undefined;
   }
-  if (route?.[0] === "search" && params.get("scan")) render();
+  if (route?.[0] === "search" && params.get("scan")) catalogReady();
 }
 async function refreshCatalog() {
+  if (loadingCatalog) return;
+  loadingCatalog = true;
   catalogState.loading = true;
-  const result = await loadCatalog(curated);
-  plugins = [
-    ...curated
-      .map((item) => result.plugins.find((p) => p.id === item.id))
-      .filter(Boolean),
-    ...result.plugins.filter((p) => !curatedIds.has(p.id)),
-  ];
-  catalogState = { ...result, loading: false };
-  searchWorker?.postMessage({ plugins });
-  if (["search", "plugin", "receipt"].includes(route?.[0])) render();
-  else catalogReady();
-  refreshScans();
+  catalogReady();
+  function applyCatalog(result, loading) {
+    plugins = [
+      ...curated
+        .map((item) => result.plugins.find((p) => p.id === item.id))
+        .filter(Boolean),
+      ...result.plugins.filter((p) => !curatedIds.has(p.id)),
+    ];
+    catalogState = { ...result, loading };
+    searchWorker?.postMessage({ plugins });
+    if (["plugin", "receipt"].includes(route?.[0])) {
+      if (
+        (route[0] === "receipt" && !loading) ||
+        (route[0] === "plugin" && !main.querySelector(".detail-header"))
+      )
+        render();
+    } else catalogReady();
+  }
+  let pendingProgress, progressTimer;
+  try {
+    const result = await loadCatalog(curated, {
+      onProgress: (result) => {
+        pendingProgress = result;
+        if (!progressTimer) progressTimer = setTimeout(() => {
+          progressTimer = undefined;
+          applyCatalog(pendingProgress, true);
+        }, 200);
+      },
+    });
+    clearTimeout(progressTimer);
+    applyCatalog(result, false);
+    refreshScans();
+  } finally {
+    clearTimeout(progressTimer);
+    loadingCatalog = false;
+  }
 }
+
 searchWorker?.postMessage({ plugins });
 window.addEventListener("hashchange", render);
 render();

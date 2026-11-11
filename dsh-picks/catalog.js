@@ -1,6 +1,8 @@
 import { safePath, canonicalLocation, npmSpec, chooseCatalogDescription } from './catalog-sources.js';
 
 export const CATALOG_SOURCE = 'DSH Picks catalog';
+export const CATALOG_MANIFEST_SOURCE = 'DSH Picks catalog manifest';
+export const CATALOG_PART_MAX_BYTES = 256 * 1024;
 const repoPattern = /^[a-zA-Z0-9][a-zA-Z0-9-]*\/[a-zA-Z0-9._-]+$/;
 const nativeKinds = new Set(['DSH 插件', '插件组合', 'DSH 主题']);
 const kinds = { plugin: 'DSH 插件', bundle: '插件组合', theme: 'DSH 主题', skill: 'Skill/工具', tool: '开发工具' };
@@ -173,13 +175,85 @@ export function validateCatalog(snapshot) {
   return snapshot;
 }
 
-export async function loadCatalog(curated, { fetcher = fetch } = {}) {
-  try {
-    const response = await fetcher(new URL('./catalog.json', import.meta.url), { credentials: 'omit', signal: AbortSignal.timeout(15000) });
-    if (!response.ok) throw new Error('目录快照读取失败');
-    const snapshot = validateCatalog(await response.json());
-    return { plugins: mergeCurated(snapshot.plugins, curated), fetchedAt: snapshot.fetchedAt, sources: snapshot.sources, warnings: [...snapshot.warnings] };
-  } catch {
-    return { plugins: curated.map(curatedRecord), fetchedAt: '', sources: [], warnings: ['完整目录暂不可用，当前仅显示编辑精选。请重试加载目录快照。'] };
+export function validateCatalogManifest(manifest) {
+  if (manifest?.schemaVersion !== 1 || manifest.source !== CATALOG_MANIFEST_SOURCE || !/^[a-f0-9]{16}$/.test(manifest.snapshotId) ||
+      JSON.stringify(manifest.columns) !== JSON.stringify(packedColumns) || !Number.isSafeInteger(manifest.total) || manifest.total < 1 || manifest.total > 100000 ||
+      !Array.isArray(manifest.parts) || !manifest.parts.length || manifest.parts.length > 1000 ||
+      typeof manifest.fetchedAt !== 'string' || !Number.isFinite(Date.parse(manifest.fetchedAt)) ||
+      !Array.isArray(manifest.warnings) || !manifest.warnings.every(item => typeof item === 'string') || !Array.isArray(manifest.sources)) throw new Error('目录清单格式无效');
+  const expected = new Set(['dsh.works', 'awesome-dsh-plugin.com']);
+  for (const item of manifest.sources) {
+    if (!item || !expected.delete(item.label) || !['ok', 'unavailable'].includes(item.status) || !Number.isSafeInteger(item.count) || item.count < 0 ||
+        (item.status === 'ok' && !item.count) || (item.status !== 'ok' && !manifest.warnings.length)) throw new Error('目录来源状态无效');
   }
+  if (expected.size || !manifest.sources.some(item => item.status === 'ok')) throw new Error('目录来源不完整');
+  let offset = 0;
+  for (const [index, part] of manifest.parts.entries()) {
+    const expectedFile = `catalog-parts/${manifest.snapshotId}-part-${String(index).padStart(3, '0')}.json`;
+    if (!part || part.file !== expectedFile || part.start !== offset || !Number.isSafeInteger(part.count) || part.count < 1 || part.count > 500 ||
+        !Number.isSafeInteger(part.bytes) || part.bytes < 2 || part.bytes > CATALOG_PART_MAX_BYTES || !/^[a-f0-9]{64}$/.test(part.sha256)) throw new Error('目录分片范围无效');
+    offset += part.count;
+  }
+  if (offset !== manifest.total) throw new Error('目录分片总量不一致');
+  return manifest;
+}
+
+async function readCatalogPart(manifest, part, fetcher) {
+  let lastError;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await fetcher(new URL('./' + part.file, import.meta.url), {
+        credentials: 'omit', signal: AbortSignal.timeout(30000), ...(attempt ? { cache: 'reload' } : {}),
+      });
+      if (!response.ok) throw new Error('目录分片读取失败');
+      const bytes = await response.arrayBuffer();
+      if (bytes.byteLength !== part.bytes) throw new Error('目录分片长度不一致');
+      const hash = await globalThis.crypto.subtle.digest('SHA-256', bytes);
+      const fingerprint = Array.from(new Uint8Array(hash), value => value.toString(16).padStart(2, '0')).join('');
+      if (fingerprint !== part.sha256) throw new Error('目录分片指纹不一致');
+      const data = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+      if (data.snapshotId !== manifest.snapshotId || data.start !== part.start || !Array.isArray(data.rows) || data.rows.length !== part.count) throw new Error('目录分片身份不一致');
+      return validateCatalog({ schemaVersion: 2, source: CATALOG_SOURCE, columns: manifest.columns, rows: data.rows,
+        fetchedAt: manifest.fetchedAt, sources: manifest.sources, warnings: manifest.warnings }).plugins;
+    } catch (error) { lastError = error; }
+  }
+  throw lastError;
+}
+
+export async function loadCatalog(curated, { fetcher = fetch, onProgress } = {}) {
+  let manifest;
+  try {
+    const response = await fetcher(new URL('./catalog-manifest.json', import.meta.url), { credentials: 'omit', signal: AbortSignal.timeout(30000) });
+    if (!response.ok) throw new Error('目录清单读取失败');
+    manifest = validateCatalogManifest(await response.json());
+  } catch {
+    return { plugins: curated.map(curatedRecord), fetchedAt: '', sources: [], loaded: 0, total: 0,
+      warnings: ['完整目录清单暂不可用，当前仅显示编辑精选。请重试加载目录。'] };
+  }
+  const completed = new Array(manifest.parts.length), ids = new Set(), identities = new Set();
+  let failed = 0, loaded = 0, next = 0;
+  function state(final = false) {
+    const community = completed.flatMap(plugins => plugins || []);
+    const warnings = [...manifest.warnings];
+    if (failed) warnings.push(`目录仅载入 ${loaded}/${manifest.total} 条，${failed} 个分片失败，请重试加载目录。`);
+    else if (final && loaded !== manifest.total) warnings.push('目录条数不完整，请重试加载目录。');
+    return { plugins: mergeCurated(community, curated), fetchedAt: manifest.fetchedAt, sources: manifest.sources,
+      warnings, loaded, total: manifest.total };
+  }
+  if (typeof onProgress === 'function') onProgress(state());
+  async function worker() {
+    while (next < manifest.parts.length) {
+      const index = next++;
+      try {
+        const plugins = await readCatalogPart(manifest, manifest.parts[index], fetcher);
+        if (plugins.some(plugin => ids.has(plugin.id) || identities.has(keyOf(plugin)))) throw new Error('目录分片存在重复身份');
+        for (const plugin of plugins) { ids.add(plugin.id); identities.add(keyOf(plugin)); }
+        completed[index] = plugins;
+        loaded += plugins.length;
+      } catch { failed++; }
+      if (typeof onProgress === 'function') onProgress(state());
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(6, manifest.parts.length) }, () => worker()));
+  return state(true);
 }

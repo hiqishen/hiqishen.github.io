@@ -4,7 +4,7 @@ export function createScanReader({ fetcher = fetch } = {}) {
   let snapshot;
   function loadScanIndex() {
     if (!snapshot) {
-      snapshot = fetcher(new URL('./market-scans.json', import.meta.url), { credentials: 'omit', signal: AbortSignal.timeout(10000) })
+      snapshot = fetcher(new URL('./market-scans.json', import.meta.url), { credentials: 'omit', signal: AbortSignal.timeout(30000) })
         .then(async response => {
           if (!response.ok) throw new Error('扫描摘要暂不可用');
           return marketScanIndex(await response.json());
