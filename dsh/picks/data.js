@@ -79,6 +79,13 @@ export const plugins = [
 
 export const editions = [
   {
+    id: "interactive-answers", date: "2026-11-11", title: "让 AI 的回答，变得可以操作",
+    coverTitle: "让 AI 的回答，\n变得可以操作",
+    teaser: "图表、表格，直接在对话里用",
+    dek: "用 GenUI 把服务数据变成能排序的表格和仪表盘，在对话里继续探索。",
+    pluginId: "genui", reason: "适合需要直观看数据、调整排序和交互探索的人。作者文档展示了表格、图表和组合界面的用法。",
+  },
+  {
     id: "blender-studio", date: "2026-11-10", title: "用对话，捏出一个 3D 模型",
     dek: "让 DSH 连上 Blender，从几条截面线开始，做出一个可以导出的瓶身。",
     pluginId: "blender", reason: "适合已经用 Blender 的人。对话修改之后，还能回到同一个场景检查曲面和导出结果。",

@@ -1,4 +1,4 @@
-import { plugins, editions } from "./data.js";
+import { plugins, editions } from "./data.js?v=3";
 import { getScan } from "./scan.js";
 import { searchPlugins, loadSubmissions, saveSubmission } from "./flows.js";
 
@@ -15,7 +15,6 @@ const paths = {
 let route,
   params,
   searchTimer,
-  artCleanup,
   lastFocusKey = "";
 const scrollPositions = new Map();
 let searchState = new URLSearchParams();
@@ -134,24 +133,110 @@ function heading(title, action) {
   if (action) h.append(action);
   return h;
 }
+
+const looks = {
+  blender: {
+    symbol: "B",
+    color: "orange",
+    title: "DSH × Blender",
+    note: "需要 Blender + Bridge",
+    description: "用对话建模、修改场景，导出 3D 文件",
+  },
+  mnemon: {
+    symbol: "m",
+    color: "green",
+    title: "dsh-mnemon",
+    note: "本地记忆 · 可查来源",
+    description: "换个对话，也记得你的项目约定",
+  },
+  genui: {
+    symbol: "UI",
+    color: "violet",
+    title: "GenUI",
+    note: "DSH Web · 重启后生效",
+    description: "把回答变成能排序、能操作的界面",
+  },
+  design: {
+    symbol: "D",
+    color: "blue",
+    title: "DeepSeek Design",
+    note: "独立组件 · deepseek-idesign",
+    description: "生成网页原型，选中元素继续改",
+  },
+  ppt: {
+    symbol: "P",
+    color: "coral",
+    title: "DeepSeek Design · PPT",
+    note: "独立组件 · deepseek-ippt",
+    description: "逐页修改演示稿，导出 PPTX",
+  },
+  video: {
+    symbol: "V",
+    color: "pink",
+    title: "DeepSeek Design · Video",
+    note: "独立组件 · deepseek-ivideo",
+    description: "用模板与时间线制作产品演示",
+  },
+};
+const previews = {
+  genui: {
+    url: "https://raw.githubusercontent.com/omdsh-dev/dsh-genui/main/assets/showcase-panel.png",
+    caption: "作者展示的可排序服务面板",
+    page: "https://github.com/omdsh-dev/dsh-genui/blob/main/README.md",
+  },
+  mnemon: {
+    url: "https://raw.githubusercontent.com/omdsh-dev/dsh-mnemon/main/docs/assets/webui-v0.5.32/en/memory-graph.jpg",
+    caption: "作者展示的记忆关系图",
+    page: "https://github.com/omdsh-dev/dsh-mnemon/blob/main/README.md",
+  },
+};
+function pluginMark(plugin, cls = "") {
+  const look = looks[plugin.id];
+  const mark = el("span", "plugin-mark " + look.color + " " + cls, look.symbol);
+  mark.setAttribute("aria-hidden", "true");
+  return mark;
+}
 function card(p) {
-  const a = link(
-    "",
-    url("plugin/" + encodeURIComponent(p.id), {
-      from: route[0] === "search" ? "search" : "",
-    }),
-    "plugin-card",
-  );
-  const top = el("div", "card-top");
-  const mark = el("span", "plugin-icon");
-  mark.append(icon("plugin"));
-  top.append(mark);
-  a.append(top, el("h3", "", p.name), el("p", "", p.summary));
-  const bottom = el("div", "card-bottom");
-  bottom.append(el("span", "", p.category), el("span", "", "了解插件 ↗"));
-  a.append(bottom);
+  const look = looks[p.id];
+  const a = link("", url("plugin/" + encodeURIComponent(p.id)), "plugin-card");
+  a.append(pluginMark(p));
+  const content = el("div", "plugin-copy");
+  content.append(el("h3", "", look.title), el("p", "", look.description));
+  const note = el("div", "plugin-note", look.note);
+  content.append(note);
+  const arrow = el("span", "row-arrow", "›");
+  arrow.setAttribute("aria-hidden", "true");
+  a.append(content, arrow);
   return a;
 }
+function sourcePreview(plugin) {
+  const preview = previews[plugin.id];
+  if (!preview) return null;
+  const figure = el("figure", "source-preview");
+  const a = external("", preview.url, "screenshot-link");
+  a.setAttribute("aria-label", preview.caption + "，打开原图");
+  const img = el("img");
+  img.src = preview.url;
+  img.alt = preview.caption;
+  img.loading = "lazy";
+  img.referrerPolicy = "no-referrer";
+  img.addEventListener(
+    "error",
+    () => {
+      a.href = preview.page;
+      a.replaceChildren(
+        el("span", "preview-unavailable", "到作者文档查看界面 ↗"),
+      );
+    },
+    { once: true },
+  );
+  a.append(img);
+  const caption = el("figcaption", "", preview.caption + " · ");
+  caption.append(external("来源 ↗", preview.page, "preview-source"));
+  figure.append(a, caption);
+  return figure;
+}
+
 function renderNav() {
   nav.replaceChildren();
   for (const [id, label] of [
@@ -175,339 +260,192 @@ function renderNav() {
     nav.append(a);
   }
 }
-function viewport() {
-  const outer = el("div");
-  const art = el("div", "hero-art");
-  const bar = el("div", "viewport-bar");
-  bar.append(
-    el("span", "", "3D STUDY / BOTTLE SECTIONS"),
-    el("span", "viewport-dots", "● ● ●"),
-  );
-  const area = el("div", "viewport-area");
-  const canvas = el("canvas");
-  canvas.tabIndex = 0;
-  canvas.setAttribute("role", "img");
-  canvas.setAttribute(
-    "aria-label",
-    "交互式瓶身截面线框示意。拖动、左右方向键或下方滑杆可旋转。此图由网页绘制，不是插件实测截图。",
-  );
-  area.append(
-    canvas,
-    el("span", "axis", "Z ↑ / Y ↗ / X →"),
-    el("span", "viewport-caption", "网页交互示意 · 非实测画面"),
-  );
-  const control = el("label", "viewport-control");
-  control.append(el("span", "", "旋转视角"));
-  const range = el("input");
-  range.type = "range";
-  range.min = "0";
-  range.max = "360";
-  range.value = "28";
-  range.setAttribute("aria-label", "旋转三维模型视角");
-  control.append(range);
-  art.append(bar, area, control);
-  outer.append(art);
-  const note = el("div", "art-note");
-  note.append(
-    el("span", "", "BLENDER × DSH"),
-    el("span", "", "拖动模型，换个角度看"),
-  );
-  outer.append(note);
-  queueMicrotask(() => drawArt(canvas, range));
-  return outer;
-}
-function drawArt(canvas, range) {
-  if (!canvas.isConnected) return;
-  let angle = (Number(range.value) * Math.PI) / 180;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  function draw() {
-    const box = canvas.getBoundingClientRect(),
-      dpr = Math.min(devicePixelRatio || 1, 2);
-    canvas.width = Math.round(box.width * dpr);
-    canvas.height = Math.round(box.height * dpr);
-    ctx.scale(dpr, dpr);
-    const w = box.width,
-      h = box.height;
-    ctx.clearRect(0, 0, w, h);
-    const scale = Math.min(w * 0.28, h * 0.31);
-    function project(x, y, z) {
-      const c = Math.cos(angle),
-        s = Math.sin(angle),
-        xx = x * c - z * s,
-        zz = x * s + z * c;
-      const yy = y * 0.83 - zz * 0.56,
-        depth = y * 0.56 + zz * 0.83;
-      return [w / 2 + xx * scale, h * 0.5 + yy * scale, depth];
-    }
-    function line(points, color, width = 0.6) {
-      ctx.beginPath();
-      points.forEach((p, i) => {
-        const q = project(...p);
-        if (i) ctx.lineTo(q[0], q[1]);
-        else ctx.moveTo(q[0], q[1]);
-      });
-      ctx.strokeStyle = color;
-      ctx.lineWidth = width;
-      ctx.stroke();
-    }
-    for (let j = -6; j <= 6; j++) {
-      line(
-        [
-          [-6, 1.13, j],
-          [6, 1.13, j],
-        ],
-        "#91b9d01a",
-      );
-      line(
-        [
-          [j, 1.13, -6],
-          [j, 1.13, 6],
-        ],
-        "#91b9d01a",
-      );
-    }
-    line(
-      [
-        [-6, 1.13, 0],
-        [6, 1.13, 0],
-      ],
-      "#b0d4f04a",
-    );
-    line(
-      [
-        [0, 1.13, -6],
-        [0, 1.13, 6],
-      ],
-      "#81b7d849",
-    );
-    const meshes = [];
-    const bottle = (u, v) => {
-      const t = v / (Math.PI * 2);
-      const profile = [
-        [0, 0.3],
-        [0.13, 0.3],
-        [0.2, 0.26],
-        [0.34, 0.72],
-        [0.5, 0.78],
-        [0.9, 0.78],
-        [1, 0.69],
-      ];
-      const next = profile.findIndex(([height]) => height >= t);
-      const [end, radius] = profile[Math.max(0, next)];
-      const [start, previous] = profile[Math.max(0, next - 1)];
-      const progress = end === start ? 0 : (t - start) / (end - start);
-      const smooth = progress * progress * (3 - 2 * progress);
-      const r = previous + (radius - previous) * smooth;
-      return [r * Math.cos(u), -1.55 + t * 2.8, r * Math.sin(u)];
-    };
-    for (let i = 0; i < 40; i++) {
-      const u = (i / 40) * Math.PI * 2;
-      const pts = [];
-      for (let j = 0; j <= 24; j++) pts.push(bottle(u, (j / 24) * Math.PI * 2));
-      meshes.push({
-        pts,
-        z: project(...bottle(u, Math.PI / 2))[2],
-        kind: "cross",
-      });
-    }
-    for (let j = 0; j <= 24; j++) {
-      const pts = [];
-      for (let i = 0; i <= 80; i++)
-        pts.push(bottle((i / 80) * Math.PI * 2, (j / 24) * Math.PI * 2));
-      meshes.push({
-        pts,
-        z: project(...bottle(0, (j / 24) * Math.PI * 2))[2],
-        kind: "ring",
-      });
-    }
-    meshes.sort((a, b) => b.z - a.z);
-    for (const m of meshes)
-      line(
-        m.pts,
-        m.kind === "cross" ? "#83cbf7b0" : "#a9dcff87",
-        m.kind === "cross" ? 0.65 : 0.8,
-      );
-    ctx.strokeStyle = "#87cfff";
-    ctx.lineWidth = 1;
-    const corners = [
-      [-0.9, -1.65, -0.9],
-      [0.9, -1.65, -0.9],
-      [0.9, 1.3, -0.9],
-      [-0.9, 1.3, -0.9],
-      [-0.9, -1.65, 0.9],
-      [0.9, -1.65, 0.9],
-      [0.9, 1.3, 0.9],
-      [-0.9, 1.3, 0.9],
-    ];
-    ctx.setLineDash([3, 5]);
-    for (const [a, b] of [
-      [0, 1],
-      [1, 2],
-      [2, 3],
-      [3, 0],
-      [4, 5],
-      [5, 6],
-      [6, 7],
-      [7, 4],
-      [0, 4],
-      [1, 5],
-      [2, 6],
-      [3, 7],
-    ])
-      line([corners[a], corners[b]], "#76b4df55");
-    ctx.setLineDash([]);
-    const center = project(0, 0, 0);
-    ctx.beginPath();
-    ctx.arc(center[0], center[1], 3, 0, Math.PI * 2);
-    ctx.fillStyle = "#ffa96d";
-    ctx.fill();
-  }
-  const update = () => {
-    angle = (Number(range.value) * Math.PI) / 180;
-    draw();
-  };
-  range.addEventListener("input", update);
-  let start;
-  canvas.addEventListener("pointerdown", (e) => {
-    start = { x: e.clientX, angle };
-    canvas.setPointerCapture(e.pointerId);
+
+function homeSearch() {
+  const form = el("form", "home-search search-box");
+  form.setAttribute("role", "search");
+  const input = el("input");
+  input.type = "search";
+  input.maxLength = 256;
+  input.enterKeyHint = "search";
+  input.placeholder = "找插件，或说说你想做什么";
+  input.setAttribute("aria-label", "搜索插件名称或需求");
+  const submit = el("button", "search-submit", "搜索");
+  submit.type = "submit";
+  submit.setAttribute("aria-label", "搜索");
+  form.append(icon("search"), input, submit);
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    go("search", { q: input.value, category: "" });
   });
-  canvas.addEventListener("pointermove", (e) => {
-    if (!start) return;
-    angle = start.angle + (e.clientX - start.x) * 0.013;
-    range.value = String(((((angle * 180) / Math.PI) % 360) + 360) % 360);
-    draw();
-  });
-  for (const event of ["pointerup", "pointercancel"])
-    canvas.addEventListener(event, () => {
-      start = null;
-    });
-  canvas.addEventListener("keydown", (e) => {
-    if (["ArrowLeft", "ArrowRight"].includes(e.key)) {
-      e.preventDefault();
-      range.value = String(
-        (Number(range.value) + (e.key === "ArrowRight" ? 10 : 350)) % 360,
-      );
-      update();
-    }
-  });
-  const observer = new ResizeObserver(draw);
-  observer.observe(canvas);
-  artCleanup = () => observer.disconnect();
-  draw();
-}
-function topicArt(plugin) {
-  const figure = el("figure", "topic-art");
-  const isMemory = plugin.id === "mnemon";
-  figure.append(
-    el(
-      "p",
-      "topic-art-label",
-      isMemory ? "PROJECT / MEMORY" : "OUTLINE / SLIDES",
-    ),
-  );
-  const steps = isMemory
-    ? ["项目约定", "本地记忆", "新对话召回"]
-    : ["汇报大纲", "逐页调整", "导出 PPTX"];
-  steps.forEach((text, index) => {
-    const row = el("div", "topic-step");
-    row.append(
-      el("span", "", String(index + 1).padStart(2, "0")),
-      el("strong", "", text),
-    );
-    figure.append(row);
-  });
-  figure.append(
-    el("figcaption", "", "依据作者说明绘制的工作流示意 · 非实测画面"),
-  );
-  return figure;
+  return form;
 }
 function home(editionId) {
-  if (editionId && !editions.some((e) => e.id === editionId)) {
-    notFound("没有找到这个选题", "返回推荐首页，查看当前精选。");
-    return;
+  if (editionId) {
+    const edition = editions.find((item) => item.id === editionId);
+    if (!edition) {
+      notFound("没有找到这个选题", "回到推荐，看看最新内容。");
+      return;
+    }
+    return editionPage(edition);
   }
-  const ed = editions.find((e) => e.id === editionId) || editions[0];
-  if (!ed) {
-    pageHead("精选内容准备中", "先到插件目录，按你的需要探索。");
-    main.append(link("找插件", url("search"), "primary"));
-    return;
+  main.append(homeSearch());
+  const categories = el("nav", "home-categories");
+  categories.setAttribute("aria-label", "按用途探索");
+  for (const [title, category] of [
+    ["全部", ""],
+    ["记忆管理", "记忆管理"],
+    ["设计创作", "设计创作"],
+    ["三维创作", "三维创作"],
+    ["数据展示", "数据展示"],
+  ]) {
+    categories.append(
+      link(title, url("search", { category, q: "" }), "category-link"),
+    );
   }
-  const p = plugins.find((p) => p.id === ed.pluginId) || plugins[0];
-  const meta = el("div", "edition-meta");
-  meta.append(
-    el("strong", "", "本期推荐 / THE EDIT"),
-    el("span", "", date(ed.date)),
+  main.append(categories);
+  const edition = editions[0];
+  const featured = plugins.find((plugin) => plugin.id === edition.pluginId);
+  const feature = link("", url("edition/" + edition.id), "feature-card");
+  const featureCopy = el("div", "feature-copy");
+  const label = el(
+    "span",
+    "feature-label",
+    "本期精选 · " + looks[featured.id].title,
   );
-  main.append(meta);
-  const hero = el("section", "hero");
-  const heroCopy = el("div", "hero-copy");
-  heroCopy.append(
-    el("p", "eyebrow", p.name + " / " + p.category),
-    el("h1", "", ed.title),
-    el("p", "hero-dek", ed.dek),
+  featureCopy.append(
+    label,
+    el("h1", "", edition.coverTitle || edition.title),
+    el("p", "", edition.teaser || edition.dek),
   );
-  const read = link(
-    "读懂这个插件",
-    url("plugin/" + encodeURIComponent(p.id), { from: "edition/" + ed.id }),
-    "primary",
+  const cta = el("span", "feature-cta", "看看怎么用");
+  cta.append(icon("arrow"));
+  featureCopy.append(cta);
+  const visual = el("div", "feature-visual");
+  visual.setAttribute("aria-hidden", "true");
+  const window = el("div", "mini-window");
+  window.append(el("span", "mini-window-title", looks[featured.id].title));
+  if (previews[featured.id]) {
+    const image = el("img");
+    image.src = previews[featured.id].url;
+    image.alt = "";
+    image.referrerPolicy = "no-referrer";
+    image.addEventListener(
+      "error",
+      () =>
+        image.replaceWith(
+          el("span", "image-fallback", looks[featured.id].title),
+        ),
+      { once: true },
+    );
+    window.append(image);
+  } else {
+    window.append(pluginMark(featured, "large"));
+  }
+  visual.append(
+    el("span", "visual-orbit"),
+    window,
+    el(
+      "span",
+      "visual-label",
+      previews[featured.id] ? "作者界面" : featured.category,
+    ),
   );
-  read.append(icon("arrow"));
-  const actions = el("div", "hero-actions");
+  feature.append(featureCopy, visual);
+  main.append(feature);
+  main.append(
+    heading(
+      "值得一试",
+      link(
+        "全部 " + plugins.length + " 个",
+        url("search", { q: "", category: "" }),
+        "text-link",
+      ),
+    ),
+  );
+  const list = el("div", "plugin-grid");
+  ["mnemon", "blender", "ppt"].forEach((id) =>
+    list.append(card(plugins.find((p) => p.id === id))),
+  );
+  main.append(list);
+  main.append(heading("按场景探索"));
+  const topics = el("div", "topic-grid");
+  const topicData = [
+    ["project-memory", "mnemon", "少重复交代", "让项目约定跟着对话走"],
+    ["editable-slides", "ppt", "交出一份汇报", "从生成到可编辑的 PPTX"],
+  ];
+  for (const [id, pluginId, title, subtitle] of topicData) {
+    const p = plugins.find((item) => item.id === pluginId);
+    const item = link(
+      "",
+      url("edition/" + id),
+      "topic-card " + looks[pluginId].color,
+    );
+    item.append(
+      pluginMark(p),
+      el("h3", "", title),
+      el("p", "", subtitle),
+      el("span", "topic-arrow", "↗"),
+    );
+    topics.append(item);
+  }
+  main.append(topics);
+  const contribute = link("", url("square"), "contribute-link");
+  contribute.append(
+    icon("square"),
+    el("span", "", "找不到合适的？来提需求"),
+    el("span", "row-arrow", "›"),
+  );
+  main.append(contribute);
+}
+function editionPage(edition) {
+  const plugin = plugins.find((p) => p.id === edition.pluginId);
+  main.append(back("home", "返回推荐"));
+  const article = el("article", "edition-page");
+  article.append(
+    el("div", "article-meta", date(edition.date) + " · 精选用例"),
+    el("h1", "", edition.title),
+    el("p", "article-dek", edition.dek),
+  );
+  const brief = card(plugin);
+  brief.href = url("plugin/" + plugin.id, { from: "edition/" + edition.id });
+  article.append(brief);
+  const preview = sourcePreview(plugin);
+  if (preview) article.append(preview);
+  article.append(
+    section("适合谁用", edition.reason),
+    section("可以这样开始", plugin.useCase),
+  );
+  const tags = el("div", "tags");
+  plugin.environment.forEach((text) => tags.append(el("span", "tag", text)));
+  article.append(
+    section("使用前了解", tags),
+    el("p", "muted", plugin.limitation),
+  );
+  const actions = el("div", "article-actions");
   actions.append(
-    read,
-    btn("复制本期链接", "text-link share-link", () => {
-      const shareURL = new URL(location.href);
-      shareURL.hash = "/edition/" + encodeURIComponent(ed.id);
-      copy(shareURL.href);
+    link(
+      "查看安装与详情",
+      url("plugin/" + plugin.id, { from: "edition/" + edition.id }),
+      "primary",
+    ),
+  );
+  actions.append(
+    btn("复制本期链接", "secondary", () => {
+      const share = new URL(location.href);
+      share.hash = "/edition/" + edition.id;
+      copy(share.href);
     }),
   );
-  heroCopy.append(actions);
-  hero.append(heroCopy, p.id === "blender" ? viewport() : topicArt(p));
-  main.append(hero);
-  const why = el("section", "reason");
-  why.append(
-    el("div", "reason-label", "为什么推荐 / WHY"),
-    el("p", "", ed.reason),
+  article.append(
+    actions,
+    el("p", "evidence-note", "用例根据作者文档整理 · 待实际运行验证"),
   );
-  main.append(why);
-  main.append(
-    heading("继续探索", link("找全部插件 ↗", url("search"), "text-link")),
-  );
-  const grid = el("div", "plugin-grid");
-  plugins
-    .filter((x) => x.id !== p.id)
-    .slice(0, 3)
-    .forEach((x) => grid.append(card(x)));
-  main.append(grid);
-  if (editions.length > 1) {
-    main.append(heading("更多选题", el("small", "", "从不同用例出发")));
-    for (const other of editions.filter((x) => x.id !== ed.id)) {
-      const a = link(
-        "",
-        url("edition/" + encodeURIComponent(other.id)),
-        "archive-row",
-      );
-      a.append(
-        el("time", "", date(other.date)),
-        el("span", "", other.title),
-        el("span", "", "↗"),
-      );
-      main.append(a);
-    }
-  }
-  const note = el("aside", "community-note");
-  const text = el("div");
-  text.append(
-    el("h3", "", "还没找到趁手的工具？"),
-    el("p", "", "记下需求，或推荐你做的插件。"),
-  );
-  note.append(text, link("去需求广场 ↗", url("square"), "text-link"));
-  main.append(note);
+  main.append(article);
 }
+
 function search() {
-  pageHead("按用途找插件", "搜名字，也可以直接说你想做什么。");
+  pageHead("找插件", "从具体问题，找到合适的工具。");
   const box = el("div", "search-box");
   box.append(icon("search"));
   const input = el("input");
@@ -626,8 +564,9 @@ function search() {
   });
   renderResults();
 }
+
 function detail(id) {
-  const p = plugins.find((p) => p.id === id);
+  const p = plugins.find((item) => item.id === id);
   if (!p) {
     notFound();
     return;
@@ -640,116 +579,101 @@ function detail(id) {
     ),
   );
   const head = el("header", "detail-header");
-  head.append(
-    el("p", "eyebrow", p.category),
-    el("h1", "", p.name),
-    el("p", "", p.summary),
+  const identity = el("div", "detail-identity");
+  identity.append(
+    el("h1", "", looks[p.id].title),
+    el("p", "", p.category + " · DSH 插件"),
   );
-  const tags = el("div", "tags");
-  (p.tags || []).forEach((t) => tags.append(el("span", "tag", t)));
-  head.append(tags);
-  main.append(head);
-  const layout = el("div", "detail-layout");
-  const body = el("div");
-  body.append(section("拿它来做什么", p.useCase));
-  const env = el("ul");
-  (p.environment || []).forEach((e) => env.append(el("li", "", e)));
-  const review = el("div");
-  review.append(el("p", "", p.review || "待实测"));
-  const dimensions = el("ul", "review-dimensions");
-  for (const dimension of ["功能完成度", "安装上手", "运行稳定性"]) {
-    const row = el("li");
-    row.append(
-      el("span", "", dimension + " · 5 分制"),
-      el("strong", "", "待实测"),
-    );
-    dimensions.append(row);
-  }
-  review.append(
-    dimensions,
-    el("p", "", "编辑完成安装和用例验证后，会在此记录测试版本和给分依据。"),
+  head.append(pluginMark(p, "large"), identity);
+  main.append(head, el("p", "detail-summary", looks[p.id].description));
+  const facts = el("div", "detail-facts");
+  facts.append(
+    el("span", "", looks[p.id].note),
+    el("span", "", "文档已核对 · 待实测"),
   );
-  body.append(
-    section("开始前，你需要", env),
-    section("使用边界与风险", p.limitation),
-    section("评测记录", review),
+  main.append(facts);
+  const install = el("section", "install-panel");
+  const installHeading = el("div", "install-heading");
+  installHeading.append(
+    el("h2", "", "安装地址"),
+    btn("复制", "copy-chip", () => copy(p.install)),
   );
-  const sources = el("div");
-  sources.append(
-    external("作者仓库 ↗", "https://github.com/" + p.repo),
-    external("安装与使用说明 ↗", p.source),
-  );
-  body.append(section("作者与来源", sources));
-  const scan = el("div", "scan-status");
-  scan.append(el("strong", "", "正在读取第三方扫描…"));
-  body.append(section("第三方静态扫描", scan));
-  getScan(p)
-    .then((result) => {
-      if (!scan.isConnected) return;
-      scan.replaceChildren(
-        el("strong", "", result.label),
-        el("p", "", result.detail),
-      );
-      if (result.url) scan.append(external("查看扫描报告 ↗", result.url));
-    })
-    .catch(() => {
-      if (scan.isConnected)
-        scan.replaceChildren(
-          el("strong", "", "扫描暂不可用"),
-          el("p", "", "稍后重新打开详情查看。静态扫描不能代替运行验证。"),
-        );
-    });
-  const side = el("aside", "detail-side");
-  const install = el("div");
-  if (p.install) {
-    const code = el("code", "install-code", p.install);
-    install.append(
-      code,
-      btn("复制安装地址", "primary full", () => copy(p.install, code)),
-    );
-  } else install.append(el("p", "", "请按作者说明手动安装。"));
-  if (p.installSteps?.length) {
-    const steps = el("ol");
-    p.installSteps.forEach((step) => steps.append(el("li", "", step)));
-    install.append(
-      steps,
-      btn("复制安装清单", "secondary full", () =>
-        copy(
-          [
-            p.name,
-            "安装引用：" + (p.install || "按作者说明手动安装"),
-            "",
-            "使用环境：",
-            ...(p.environment || []).map((s) => "- " + s),
-            "",
-            "安装步骤：",
-            ...p.installSteps.map((s, i) => `${i + 1}. ${s}`),
-            "",
-            "作者说明：" + p.source,
-            "说明：未执行安装或兼容性实测，请按作者文档核对。",
-          ].join("\n"),
-        ),
+  install.append(installHeading, el("code", "install-code", p.install));
+  main.append(install);
+  const actions = el("div", "detail-actions");
+  actions.append(
+    btn("复制安装清单", "primary", () =>
+      copy(
+        [
+          p.name,
+          "安装引用 " + p.install,
+          "",
+          "使用环境",
+          ...p.environment.map((text) => "• " + text),
+          "",
+          "安装步骤",
+          ...p.installSteps.map((step, index) => index + 1 + ". " + step),
+          "",
+          "作者说明 " + p.source,
+          "",
+          p.review,
+        ].join("\n"),
       ),
-    );
-  }
-  install.append(external("打开作者安装说明 ↗", p.source));
-  side.append(section("安装这个插件", install));
-  const note = el(
-    "p",
-    "form-hint",
-    "复制后在 DSH 中按作者说明安装；本页未执行安装或兼容性实测。",
-  );
-  side.append(note);
-  side.append(
-    btn("复制插件分享链接 ↗", "text-link share-link", () => {
-      const shareURL = new URL(location.href);
-      shareURL.hash = "/plugin/" + encodeURIComponent(p.id);
-      copy(shareURL.href);
+    ),
+    btn("分享", "secondary share-button", () => {
+      const share = new URL(location.href);
+      share.hash = "/plugin/" + p.id;
+      copy(share.href);
     }),
   );
-  layout.append(body, side);
-  main.append(layout);
+  main.append(actions);
+  const preview = sourcePreview(p);
+  if (preview) main.append(preview);
+  const useCase = el("div", "use-case");
+  useCase.append(
+    icon("check"),
+    el("p", "", p.useCase.replace(/^用例参考[：:]\s*/, "")),
+  );
+  main.append(section("用它做什么", useCase));
+  const environment = el("ul");
+  p.environment.forEach((text) => environment.append(el("li", "", text)));
+  main.append(section("准备与安装", environment));
+  const steps = el("ol", "install-steps");
+  p.installSteps.forEach((text) => steps.append(el("li", "", text)));
+  main.append(steps, el("p", "limitation", p.limitation));
+  const scan = el("div", "scan-status");
+  scan.append(el("strong", "", "正在读取扫描记录…"));
+  main.append(section("安全与验证", scan));
+  getScan(p).then((result) => {
+    if (!scan.isConnected) return;
+    scan.replaceChildren(
+      el("strong", "", result.label),
+      el("p", "", result.detail),
+    );
+    if (result.url) scan.append(external("查看原报告 ↗", result.url));
+  });
+  const review = el("details", "review-section");
+  const summary = el("summary");
+  summary.append(el("span", "", "编辑评测"), el("span", "muted", "待实测"));
+  const dimensions = el("ul", "review-dimensions");
+  ["功能完成度", "安装上手", "运行稳定性"].forEach((text) => {
+    const row = el("li");
+    row.append(
+      el("span", "", text + " · 5 分制"),
+      el("span", "muted", "待实测"),
+    );
+    dimensions.append(row);
+  });
+  review.append(summary, dimensions, el("p", "evidence-note", p.review));
+  main.append(review);
+  const sources = el("div", "source-links");
+  sources.append(
+    external("作者仓库 ↗", "https://github.com/" + p.repo),
+    external("使用说明 ↗", p.source),
+  );
+  main.append(sources);
 }
+
 async function copy(value, code) {
   try {
     await navigator.clipboard.writeText(value);
@@ -788,29 +712,42 @@ function showCopyFallback(value) {
   text.setSelectionRange(0, value.length);
 }
 function square() {
-  pageHead("需求广场", "把缺的那一块工具，说清楚。");
+  pageHead("需求广场", "需要什么工具，或做了什么好插件？");
   const actions = el("div", "form-actions");
-  actions.append(
-    link("我需要一个插件", url("submit/request"), "primary"),
-    link("推荐 / 自荐插件", url("submit/nomination"), "secondary"),
-  );
+  for (const [title, note, path, tone, glyph] of [
+    [
+      "我需要一个插件",
+      "说说你的使用场景",
+      "submit/request",
+      "primary",
+      "square",
+    ],
+    [
+      "推荐 / 自荐插件",
+      "分享你发现的好工具",
+      "submit/nomination",
+      "secondary",
+      "plugin",
+    ],
+  ]) {
+    const action = link("", url(path), tone + " contribution-action");
+    action.setAttribute("aria-label", title);
+    action.append(icon(glyph), el("strong", "", title), el("span", "", note));
+    actions.append(action);
+  }
   main.append(
     actions,
-    el(
-      "p",
-      "form-note",
-      "这里是本机需求箱。需求、自荐和回执仅保存在当前浏览器，不会发送到社区；请勿填写个人信息或凭据。",
-    ),
+    el("p", "form-note", "原型体验 · 提交记录保存在当前浏览器"),
   );
   const records = localRecords();
   if (!records.length) {
     const empty = el("div", "empty");
     empty.append(
-      el("h2", "", "好工具，也可以从你的需求开始"),
+      el("h2", "", "还没有本机记录"),
       el(
         "p",
         "",
-        "记录要解决的问题、使用环境和期待结果。保存后，你会拿到一个可找回的本机回执。",
+        "从上面选一个入口开始。保存后，可以在这里查看需求、自荐和关联方案。",
       ),
     );
     main.append(empty);
@@ -856,7 +793,7 @@ function submit(kind) {
   kind = kind === "nomination" ? "nomination" : "request";
   main.append(back("square", "返回需求广场"));
   pageHead(
-    kind === "request" ? "我需要一个插件" : "让好工具，被看见。",
+    kind === "request" ? "我需要一个插件" : "推荐 / 自荐插件",
     kind === "request"
       ? "从具体场景开始，比一个功能名更有帮助。"
       : "已有方案或你做的插件，都可以留下本机记录。",
@@ -866,7 +803,7 @@ function submit(kind) {
     el(
       "p",
       "form-note",
-      "仅保存到当前浏览器，不会公开发布或通知开发者。请勿填写姓名、账号、联系方式或密钥。",
+      "原型体验 · 仅保存到当前浏览器，请勿填写个人信息或密钥。",
     ),
   );
   const requestId = params.get("requestId");
@@ -991,7 +928,7 @@ function receipt(id) {
     el("div", "receipt-id", r.id),
     el("p", "", r.description),
     el("p", "", "保存时间：" + new Date(r.createdAt).toLocaleString("zh-CN")),
-    el("p", "", "记录保留在当前浏览器，尚未提交社区，也不代表开发者已接单。"),
+    el("p", "", "原型记录保存在当前浏览器，状态待核验。"),
   );
   if (r.repo)
     box.append(
@@ -1084,8 +1021,6 @@ function notFound(
 function render() {
   clearTimeout(searchTimer);
   if (activeHash) scrollPositions.set(activeHash, window.scrollY);
-  artCleanup?.();
-  artCleanup = null;
   activeHash = location.hash || "#/home";
   const raw = activeHash.replace(/^#\/?/, "");
   const [path, query = ""] = raw.split("?");
@@ -1099,6 +1034,13 @@ function render() {
     searchState = new URLSearchParams(params);
   }
   main.replaceChildren();
+  main.dataset.view = route[0];
+  document.querySelector(".footer").hidden = [
+    "square",
+    "submit",
+    "receipt",
+    "request",
+  ].includes(route[0]);
   renderNav();
   switch (route[0]) {
     case "home":
