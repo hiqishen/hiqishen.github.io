@@ -1,4 +1,5 @@
-import { plugins as curated, editions } from "./data.js?v=4";
+import { plugins as curated, editions } from "./data.js?v=6";
+import { resultWindow } from "./result-window.js";
 import { loadCatalog } from "./catalog.js?v=5";
 import { filterCatalog, readPreference, writePreference } from "./library.js";
 let plugins = curated;
@@ -65,6 +66,7 @@ let route,
   searchTimer,
   lastFocusKey = "";
 const scrollPositions = new Map();
+const searchWindows = new Map();
 let searchState = new URLSearchParams();
 let activeHash = "";
 function el(tag, cls, text) {
@@ -437,16 +439,86 @@ function home(editionId) {
   feature.append(featureCopy, visual);
   main.append(feature);
   main.append(
-    heading(
-      "值得一试",
-      link("全部插件", url("search", { reset: true }), "text-link"),
-    ),
+    heading("推荐插件", el("small", "", curated.length + " 款 · 按用途挑选")),
   );
-  const list = el("div", "plugin-grid");
-  ["mnemon", "blender", "ppt"].forEach((id) =>
-    list.append(card(plugins.find((p) => p.id === id))),
+  const picks = [
+    "genui",
+    "entry-6de6f418e2aa31ea",
+    "mnemon",
+    "entry-8b8a0e4021b6404d",
+    "ppt",
+    "entry-76d59a386e938958",
+    "blender",
+    "entry-692421c68f32118e",
+    "entry-6107cc9cc84b9a24",
+    "entry-3f4f4be2cc6b51ea",
+    "entry-f2c81d0a09c8383d",
+    "entry-1a855c62586dbfb7",
+    "design",
+    "video",
+    "entry-e84ea7a6a2b8b9bc",
+    "entry-c4bb1464f57031bb",
+    "entry-7fc2b5135c8f9122",
+    "entry-21f277bfd411922f",
+    "entry-929157747706e459",
+    "entry-03f8b76a569ec4ab",
+  ]
+    .map((id) => curated.find((p) => p.id === id))
+    .filter(Boolean);
+  const groups = [
+    "全部",
+    "联网与浏览",
+    "文档与知识",
+    "创作与可视化",
+    "开发与效率",
+    "桌面体验",
+  ];
+  const chips = el("div", "chips recommendation-filters");
+  chips.setAttribute("aria-label", "推荐用途");
+  const list = el("div", "plugin-grid recommendation-list");
+  let selectedGroup = "全部",
+    shown = 12;
+  function groupOf(p) {
+    return p.group || (p.id === "mnemon" ? "文档与知识" : "创作与可视化");
+  }
+  function visiblePicks() {
+    return picks.filter(
+      (p) => selectedGroup === "全部" || groupOf(p) === selectedGroup,
+    );
+  }
+  const more = btn("", "secondary load-more", () => {
+    shown += 12;
+    drawPicks(true);
+  });
+  function drawPicks(append = false) {
+    const available = visiblePicks();
+    const start = append ? list.children.length : 0;
+    if (!append) list.replaceChildren();
+    available.slice(start, shown).forEach((p) => list.append(card(p)));
+    more.hidden = shown >= available.length;
+    more.textContent =
+      "继续看推荐 · 还有 " + Math.max(0, available.length - shown) + " 款";
+    for (const button of chips.children)
+      button.setAttribute(
+        "aria-pressed",
+        String(button.textContent === selectedGroup),
+      );
+  }
+  for (const group of groups)
+    chips.append(
+      btn(group, "chip", () => {
+        selectedGroup = group;
+        shown = 12;
+        drawPicks();
+      }),
+    );
+  drawPicks();
+  main.append(
+    chips,
+    list,
+    more,
+    el("p", "recommendation-note", "用途与安装参考作者文档，运行效果待实测。"),
   );
-  main.append(list);
   main.append(heading("按场景探索"));
   const topics = el("div", "topic-grid");
   const topicData = [
@@ -524,6 +596,9 @@ function editionPage(edition) {
 }
 
 function search() {
+  const searchHash = activeHash;
+  let restoreY = scrollPositions.get(searchHash) || null;
+  let restoreWindow = searchWindows.has(searchHash);
   pageHead("找插件", "说说你要做什么，或直接查找插件名称。");
   const box = el("div", "search-box");
   box.append(icon("search"));
@@ -707,6 +782,12 @@ function search() {
         ),
       ].sort();
       const current = params.get(name) || "";
+      const optionValues = ["", ...values];
+      if (
+        [...select.options].map((o) => o.value).join("\0") ===
+        optionValues.join("\0")
+      )
+        continue;
       select.replaceChildren();
       const blank = el("option", "", name === "kind" ? "全部类型" : "全部用途");
       blank.value = "";
@@ -721,88 +802,130 @@ function search() {
   }
   updateCatalogNote();
   main.append(dataNote);
-  const results = el("section");
-  results.setAttribute("aria-live", "polite");
+  const results = el("section", "search-results");
+  const meta = el("div", "result-meta");
+  const count = el("span", "result-count", "正在查找…");
+  count.setAttribute("role", "status");
+  const reorder = btn("更新结果排序", "text-link", () => {
+    restoreY = null;
+    restoreWindow = false;
+    showResults(false);
+  });
+  reorder.hidden = true;
+  meta.append(count, reorder);
+  const status = el("p", "result-status");
+  status.setAttribute("role", "status");
+  const listNode = el("div", "plugin-grid");
+  const empty = el("div", "empty");
+  empty.hidden = true;
+  empty.append(
+    el("h2", "", "暂时没有符合条件的插件"),
+    el("p", "", "试试减少筛选条件、切换场景搜索，或提出你的开发需求。"),
+  );
+  const requestLink = link("带着需求，求开发 →", "#/submit/request", "primary");
+  empty.append(requestLink);
+  let available = [],
+    visible = [...(searchWindows.get(searchHash) || [])],
+    queryKey = "",
+    requestNumber = 0;
+  let limit = Math.max(24, Number(params.get("limit")) || 24);
+  const more = btn("继续浏览", "secondary load-more", () => {
+    restoreY = null;
+    limit = Math.min(available.length, visible.length + 24);
+    params.set("limit", String(limit));
+    history.replaceState(null, "", url("search"));
+    activeHash = location.hash;
+    searchState = new URLSearchParams(params);
+    showResults(true);
+  });
+  more.hidden = true;
+  results.append(meta, status, listNode, empty, more);
   main.append(results);
-  let requestNumber = 0;
   function setParam(key, value) {
+    restoreY = null;
+    restoreWindow = false;
     if (value) params.set(key, value);
     else params.delete(key);
     params.delete("limit");
   }
-  async function renderResults() {
+  function showResults(preserve) {
+    const next = resultWindow(visible, available, limit, preserve);
+    const byId = new Map(available.map((p) => [p.id, p]));
+    const nodes = new Map(
+      [...listNode.children].map((n) => [n.dataset.pluginId, n]),
+    );
+    const keep = new Set(next);
+    for (const [id, node] of nodes) if (!keep.has(id)) node.remove();
+    for (let i = 0; i < next.length; i++) {
+      const id = next[i];
+      const node = nodes.get(id) || card(byId.get(id));
+      if (listNode.children[i] !== node)
+        listNode.insertBefore(node, listNode.children[i] || null);
+      node.href = url("plugin/" + encodeURIComponent(id));
+    }
+    visible = next;
+    searchWindows.set(activeHash, [...visible]);
+    count.textContent = available.length.toLocaleString("zh-CN") + " 个结果";
+    empty.hidden = Boolean(available.length);
+    requestLink.href = url("submit/request", { title: input.value });
+    more.hidden = visible.length >= available.length;
+    more.textContent =
+      "继续浏览 · 已显示 " + visible.length + " / " + available.length;
+    reorder.hidden = !visible.some((id, index) => available[index]?.id !== id);
+    if (restoreY !== null && activeHash === searchHash) {
+      const maximum = Math.max(
+        0,
+        document.documentElement.scrollHeight - window.innerHeight,
+      );
+      if (maximum >= restoreY || !catalogState.loading) {
+        window.scrollTo(0, Math.min(restoreY, maximum));
+        restoreY = null;
+      }
+    }
+  }
+  async function renderResults(background = false) {
     const thisRequest = ++requestNumber;
-    results.replaceChildren(el("p", "result-meta", "正在查找…"));
+    const options = Object.fromEntries(params);
+    delete options.limit;
+    const nextKey = JSON.stringify([input.value, options]);
+    const preserve = restoreWindow || (background && queryKey === nextKey);
+    results.setAttribute("aria-busy", "true");
+    if (!background) status.textContent = "正在查找…";
     if (params.get("scan") && !scanStatuses) {
-      results.replaceChildren(
+      status.replaceChildren(
         el(
-          "p",
-          "form-hint",
+          "span",
+          "",
           scanFailure
             ? "扫描摘要暂不可用，请取消扫描筛选或重试。"
             : "正在读取扫描摘要…",
         ),
       );
       if (scanFailure)
-        results.append(btn("重试扫描摘要", "secondary", refreshScans));
+        status.append(btn("重试扫描摘要", "text-link", refreshScans));
+      results.setAttribute("aria-busy", "false");
       return;
     }
-    const options = Object.fromEntries(params);
     if (options.favorites) options.favorites = favoriteIds();
     else delete options.favorites;
     if (options.scan) options.scanStatuses = scanStatuses;
     const list = await findPlugins(input.value, options);
     if (!results.isConnected || thisRequest !== requestNumber) return;
-    results.replaceChildren();
-    results.append(
-      el("div", "result-meta", list.length.toLocaleString("zh-CN") + " 个结果"),
-    );
-    if (list.length) {
-      let limit = Math.min(
-        list.length,
-        Math.max(
-          24,
-          Math.min(plugins.length, Number(params.get("limit")) || 24),
-        ),
+    available = list;
+    queryKey = nextKey;
+    if (!preserve)
+      limit = Math.max(
+        24,
+        Math.min(plugins.length, Number(params.get("limit")) || 24),
       );
-      const listNode = el("div", "plugin-grid");
-      list.slice(0, limit).forEach((p) => listNode.append(card(p)));
-      results.append(listNode);
-      const more = btn("", "secondary load-more", () => {
-        const next = Math.min(list.length, limit + 24);
-        list.slice(limit, next).forEach((p) => listNode.append(card(p)));
-        limit = next;
-        params.set("limit", String(limit));
-        history.replaceState(null, "", url("search"));
-        activeHash = location.hash;
-        searchState = new URLSearchParams(params);
-        updateMore();
-      });
-      function updateMore() {
-        for (const item of listNode.children)
-          item.href = url(
-            "plugin/" + encodeURIComponent(item.dataset.pluginId),
-          );
-        more.hidden = limit >= list.length;
-        more.textContent = "继续浏览 · 已显示 " + limit + " / " + list.length;
-      }
-      updateMore();
-      results.append(more);
-    } else {
-      const empty = el("div", "empty");
-      empty.append(
-        el("h2", "", "暂时没有符合条件的插件"),
-        el("p", "", "试试减少筛选条件、切换场景搜索，或提出你的开发需求。"),
-        link(
-          "带着需求，求开发 →",
-          url("submit/request", { title: input.value }),
-          "primary",
-        ),
-      );
-      results.append(empty);
-    }
+    status.replaceChildren();
+    showResults(preserve);
+    restoreWindow = false;
+    results.setAttribute("aria-busy", "false");
   }
   function apply() {
+    restoreY = null;
+    restoreWindow = false;
     if (input.value) params.set("q", input.value);
     else params.delete("q");
     params.delete("limit");
@@ -843,7 +966,7 @@ function search() {
   });
   catalogReady = () => {
     updateCatalogNote();
-    if (!composing) renderResults();
+    if (!composing) renderResults(true);
   };
   renderResults();
 }
@@ -1496,7 +1619,8 @@ function render() {
   document.title =
     (main.querySelector("h1")?.textContent || "插件精选") + " · DSH PICKS";
   requestAnimationFrame(() => {
-    window.scrollTo(0, scrollPositions.get(activeHash) || 0);
+    if (route[0] !== "search" || !scrollPositions.get(activeHash))
+      window.scrollTo(0, scrollPositions.get(activeHash) || 0);
     if (lastFocusKey) main.focus({ preventScroll: true });
     lastFocusKey = activeHash;
   });
@@ -1543,10 +1667,11 @@ async function refreshCatalog() {
     const result = await loadCatalog(curated, {
       onProgress: (result) => {
         pendingProgress = result;
-        if (!progressTimer) progressTimer = setTimeout(() => {
-          progressTimer = undefined;
-          applyCatalog(pendingProgress, true);
-        }, 200);
+        if (!progressTimer)
+          progressTimer = setTimeout(() => {
+            progressTimer = undefined;
+            applyCatalog(pendingProgress, true);
+          }, 200);
       },
     });
     clearTimeout(progressTimer);

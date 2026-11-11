@@ -1,3 +1,4 @@
+import { recommendations } from "./recommendations.js?v=6";
 const designRepo = "Devin-AXIS/deepseek-design";
 const designSource = "https://github.com/" + designRepo + "/blob/main/README.md";
 const designEnvironment = ["DSH", "Node.js ^22.19.0 或 ≥24.0.0（同时满足 DSH 宿主要求）", "pnpm"];
@@ -75,6 +76,7 @@ export const plugins = [
     useCase: "用例参考：选一个产品演示模板，替换画面文字和主题，在时间线上预览后导出。",
     limitation: "视频使用独立工作目录。导出前请按作者说明完成项目校验。",
   }),
+  ...recommendations,
 ];
 
 export const editions = [

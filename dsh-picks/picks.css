@@ -1305,3 +1305,39 @@ main:focus {
   flex-basis: 100%;
   margin-top: 0;
 }
+
+.catalog-note {
+  min-height: 42px;
+  font-variant-numeric: tabular-nums;
+}
+.search-results .result-meta {
+  min-height: 44px;
+  align-items: center;
+  font-variant-numeric: tabular-nums;
+}
+.result-status {
+  min-height: 20px;
+  margin: 0;
+  font-size: 12px;
+  color: #78839a;
+}
+.result-status .text-link {
+  margin-left: 12px;
+}
+.result-meta .text-link {
+  min-height: 36px;
+  font-size: 11px;
+  padding: 5px 0;
+}
+.empty[hidden],
+.result-meta [hidden] {
+  display: none;
+}
+.recommendation-filters {
+  margin-bottom: 8px;
+}
+.recommendation-note {
+  font-size: 11px;
+  color: #78839a;
+  margin: 12px 0 24px;
+}
