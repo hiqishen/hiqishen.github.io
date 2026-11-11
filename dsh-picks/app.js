@@ -1,5 +1,52 @@
-import { plugins, editions } from "./data.js?v=3";
-import { getScan } from "./scan.js";
+import { plugins as curated, editions } from "./data.js?v=4";
+import { loadCatalog } from "./catalog.js";
+import { filterCatalog, readPreference, writePreference } from "./library.js";
+let plugins = curated;
+const curatedIds = new Set(curated.map((p) => p.id));
+let catalogState = { loading: true, warnings: [], fetchedAt: "" };
+let scanStatuses,
+  scanFailure = false;
+let searchWorker;
+let catalogReady = () => {};
+const searches = new Map();
+let searchSequence = 0;
+try {
+  searchWorker = new Worker(new URL("./search-worker.js", import.meta.url), {
+    type: "module",
+  });
+  searchWorker.onmessage = ({ data }) => {
+    searches.get(data.id)?.(data.result);
+    searches.delete(data.id);
+  };
+  searchWorker.onerror = () => {
+    searchWorker?.terminate();
+    searchWorker = undefined;
+    for (const resolve of searches.values()) resolve(null);
+    searches.clear();
+  };
+} catch {}
+function favoriteIds() {
+  const ids = new Set();
+  try {
+    for (const p of plugins)
+      if (readPreference(localStorage, p.id, "favorite")) ids.add(p.id);
+  } catch {
+    notify("部分本机收藏无法读取");
+  }
+  return ids;
+}
+async function findPlugins(query, options) {
+  if (!searchWorker) return filterCatalog(plugins, query, options);
+  const id = ++searchSequence;
+  const result = await new Promise((resolve) => {
+    searches.set(id, resolve);
+    searchWorker.postMessage({ id, query, options });
+  });
+  if (result === null) return filterCatalog(plugins, query, options);
+  const byId = new Map(plugins.map((p) => [p.id, p]));
+  return result.map((id) => byId.get(id)).filter(Boolean);
+}
+import { getScan, getScanStatuses } from "./scan.js";
 import { searchPlugins, loadSubmissions, saveSubmission } from "./flows.js";
 
 const main = document.querySelector("#main");
@@ -66,16 +113,27 @@ function btn(text, cls, fn) {
 }
 function url(path, extra = {}) {
   const p = new URLSearchParams();
-  if (["search", "plugin"].includes(path.split("/")[0])) {
+  if (!extra.reset && ["search", "plugin"].includes(path.split("/")[0])) {
     const source = ["search", "plugin"].includes(route?.[0])
       ? params
       : searchState;
-    for (const key of ["q", "category"]) {
+    for (const key of [
+      "q",
+      "category",
+      "mode",
+      "kind",
+      "install",
+      "scan",
+      "sort",
+      "favorites",
+      "limit",
+    ]) {
       const value = source.get(key);
       if (value) p.set(key, value);
     }
   }
   for (const [k, v] of Object.entries(extra)) {
+    if (k === "reset") continue;
     if (v) p.set(k, v);
     else p.delete(k);
   }
@@ -190,15 +248,39 @@ const previews = {
     page: "https://github.com/omdsh-dev/dsh-mnemon/blob/main/README.md",
   },
 };
+function appearance(p) {
+  return (
+    looks[p.id] || {
+      color: ["blue", "violet", "coral", "mint"][p.name.length % 4],
+      symbol: p.name
+        .replace(/^dsh[-_ ]*/i, "")
+        .slice(0, 2)
+        .toUpperCase(),
+      title: p.name,
+      description: p.summary,
+      note: [
+        p.category,
+        p.install
+          ? "有安装地址"
+          : {
+              manual: "需手动安装",
+              broken: "索引标记失效",
+              ecosystem: "按项目说明使用",
+            }[p.installStatus] || "安装待核实",
+      ].join(" · "),
+    }
+  );
+}
 function pluginMark(plugin, cls = "") {
-  const look = looks[plugin.id];
+  const look = appearance(plugin);
   const mark = el("span", "plugin-mark " + look.color + " " + cls, look.symbol);
   mark.setAttribute("aria-hidden", "true");
   return mark;
 }
 function card(p) {
-  const look = looks[p.id];
+  const look = appearance(p);
   const a = link("", url("plugin/" + encodeURIComponent(p.id)), "plugin-card");
+  a.dataset.pluginId = p.id;
   a.append(pluginMark(p));
   const content = el("div", "plugin-copy");
   content.append(el("h3", "", look.title), el("p", "", look.description));
@@ -276,7 +358,7 @@ function homeSearch() {
   form.append(icon("search"), input, submit);
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    go("search", { q: input.value, category: "" });
+    go("search", { q: input.value, reset: true });
   });
   return form;
 }
@@ -300,7 +382,7 @@ function home(editionId) {
     ["数据展示", "数据展示"],
   ]) {
     categories.append(
-      link(title, url("search", { category, q: "" }), "category-link"),
+      link(title, url("search", { category, reset: true }), "category-link"),
     );
   }
   main.append(categories);
@@ -356,11 +438,7 @@ function home(editionId) {
   main.append(
     heading(
       "值得一试",
-      link(
-        "全部 " + plugins.length + " 个",
-        url("search", { q: "", category: "" }),
-        "text-link",
-      ),
+      link("全部插件", url("search", { reset: true }), "text-link"),
     ),
   );
   const list = el("div", "plugin-grid");
@@ -445,13 +523,13 @@ function editionPage(edition) {
 }
 
 function search() {
-  pageHead("找插件", "从具体问题，找到合适的工具。");
+  pageHead("找插件", "说说你要做什么，或直接查找插件名称。");
   const box = el("div", "search-box");
   box.append(icon("search"));
   const input = el("input");
   input.type = "search";
   input.maxLength = 256;
-  input.placeholder = "试试：3D 建模、记忆、做 PPT";
+  input.placeholder = "用途、名称、npm 包名";
   input.value = params.get("q") || "";
   input.setAttribute("aria-label", "搜索插件名称或需求");
   box.append(input);
@@ -463,51 +541,225 @@ function search() {
   clear.setAttribute("aria-label", "清空搜索");
   box.append(clear);
   main.append(box);
-  const chips = el("div", "chips");
-  const cats = ["", ...new Set(plugins.map((p) => p.category))];
-  cats.forEach((c) => {
-    const b = btn(c || "全部", "chip", () => {
-      params.set("category", c);
-      if (!c) params.delete("category");
-      history.replaceState(null, "", url("search"));
-      searchState = new URLSearchParams(params);
-      renderNav();
-      renderResults();
-      for (const n of chips.children)
-        n.setAttribute("aria-pressed", String(n === b));
+  const mode = el("div", "search-modes");
+  for (const [value, label] of [
+    ["", "场景搜索"],
+    ["exact", "精确名称 / 包名"],
+  ]) {
+    const button = btn(label, "chip", () => {
+      setParam("mode", value);
+      apply();
+      for (const item of mode.children)
+        item.setAttribute("aria-pressed", String(item === button));
     });
-    b.setAttribute(
+    button.setAttribute(
       "aria-pressed",
-      String((params.get("category") || "") === c),
+      String((params.get("mode") || "") === value),
     );
-    chips.append(b);
-  });
-  main.append(chips);
+    mode.append(button);
+  }
+  main.append(
+    mode,
+    el(
+      "p",
+      "search-help",
+      "场景搜索支持关键词、中文同义词与需求短句。精确查找匹配完整名称、包名或仓库地址。",
+    ),
+  );
+  const filters = el("details", "catalog-filters");
+  filters.open = [
+    "category",
+    "kind",
+    "install",
+    "scan",
+    "favorites",
+    "sort",
+  ].some((k) => params.get(k));
+  filters.append(el("summary", "", "筛选与排序"));
+  const grid = el("div", "filter-grid");
+  for (const [name, title, values] of [
+    [
+      "category",
+      "用途",
+      [
+        ["", "全部用途"],
+        ...[...new Set(plugins.map((p) => p.category))]
+          .sort()
+          .map((x) => [x, x]),
+      ],
+    ],
+    [
+      "kind",
+      "类型",
+      [
+        ["", "全部类型"],
+        ...[...new Set(plugins.map((p) => p.kind || "DSH 插件"))]
+          .sort()
+          .map((x) => [x, x]),
+      ],
+    ],
+    [
+      "install",
+      "安装",
+      [
+        ["", "不限安装状态"],
+        ["available", "有安装地址"],
+      ],
+    ],
+    [
+      "scan",
+      "扫描报告",
+      [
+        ["", "不限扫描状态"],
+        ["reported", "有匹配报告"],
+        ["review", "需复核 / 未通过"],
+      ],
+    ],
+    [
+      "sort",
+      "排序",
+      [
+        ["", "默认 / 搜索相关"],
+        ["updated", "最近更新"],
+        ["name", "名称 A–Z"],
+      ],
+    ],
+    [
+      "favorites",
+      "收藏",
+      [
+        ["", "全部插件"],
+        ["1", "我的本机收藏"],
+      ],
+    ],
+  ]) {
+    const field = el("label", "filter-field");
+    field.append(el("span", "", title));
+    const select = el("select");
+    select.name = name;
+    for (const [value, label] of values) {
+      const o = el("option", "", label);
+      o.value = value;
+      select.append(o);
+    }
+    select.value = params.get(name) || "";
+    select.addEventListener("change", () => {
+      setParam(name, select.value);
+      apply();
+    });
+    field.append(select);
+    grid.append(field);
+  }
+  filters.append(
+    grid,
+    btn("重置筛选", "text-link", () => {
+      for (const key of [
+        "category",
+        "kind",
+        "install",
+        "scan",
+        "sort",
+        "favorites",
+        "limit",
+      ])
+        params.delete(key);
+      history.replaceState(null, "", url("search"));
+      activeHash = location.hash;
+      render();
+    }),
+  );
+  main.append(filters);
+  const dataNote = el("div", "catalog-note");
+  if (catalogState.loading)
+    dataNote.append(el("p", "", "正在读取全部目录，先浏览已整理的推荐…"));
+  else if (catalogState.warnings.length) {
+    dataNote.append(
+      el("p", "", catalogState.warnings.join(" ")),
+      btn("重新读取", "text-link", refreshCatalog),
+    );
+  } else
+    dataNote.append(
+      el(
+        "p",
+        "",
+        plugins.length.toLocaleString("zh-CN") +
+          " 个收录条目 · 目录更新 " +
+          date(catalogState.fetchedAt),
+      ),
+    );
+  main.append(dataNote);
   const results = el("section");
   results.setAttribute("aria-live", "polite");
   main.append(results);
-  function renderResults() {
+  let requestNumber = 0;
+  function setParam(key, value) {
+    if (value) params.set(key, value);
+    else params.delete(key);
+    params.delete("limit");
+  }
+  async function renderResults() {
+    const thisRequest = ++requestNumber;
+    results.replaceChildren(el("p", "result-meta", "正在查找…"));
+    if (params.get("scan") && !scanStatuses) {
+      results.replaceChildren(
+        el(
+          "p",
+          "form-hint",
+          scanFailure
+            ? "扫描摘要暂不可用，请取消扫描筛选或重试。"
+            : "正在读取扫描摘要…",
+        ),
+      );
+      if (scanFailure)
+        results.append(btn("重试扫描摘要", "secondary", refreshScans));
+      return;
+    }
+    const options = Object.fromEntries(params);
+    if (options.favorites) options.favorites = favoriteIds();
+    else delete options.favorites;
+    if (options.scan) options.scanStatuses = scanStatuses;
+    const list = await findPlugins(input.value, options);
+    if (!results.isConnected || thisRequest !== requestNumber) return;
     results.replaceChildren();
-    const list = searchPlugins(
-      plugins,
-      input.value,
-      params.get("category") || "",
+    results.append(
+      el("div", "result-meta", list.length.toLocaleString("zh-CN") + " 个结果"),
     );
-    const meta = el("div", "result-meta");
-    meta.append(
-      el("span", "", list.length + " 个精选插件"),
-      el("span", "", "说明已核对 · 使用待实测"),
-    );
-    results.append(meta);
     if (list.length) {
-      const grid = el("div", "plugin-grid");
-      list.forEach((p) => grid.append(card(p)));
-      results.append(grid);
+      let limit = Math.min(
+        list.length,
+        Math.max(
+          24,
+          Math.min(plugins.length, Number(params.get("limit")) || 24),
+        ),
+      );
+      const listNode = el("div", "plugin-grid");
+      list.slice(0, limit).forEach((p) => listNode.append(card(p)));
+      results.append(listNode);
+      const more = btn("", "secondary load-more", () => {
+        const next = Math.min(list.length, limit + 24);
+        list.slice(limit, next).forEach((p) => listNode.append(card(p)));
+        limit = next;
+        params.set("limit", String(limit));
+        history.replaceState(null, "", url("search"));
+        activeHash = location.hash;
+        searchState = new URLSearchParams(params);
+        updateMore();
+      });
+      function updateMore() {
+        for (const item of listNode.children)
+          item.href = url(
+            "plugin/" + encodeURIComponent(item.dataset.pluginId),
+          );
+        more.hidden = limit >= list.length;
+        more.textContent = "继续浏览 · 已显示 " + limit + " / " + list.length;
+      }
+      updateMore();
+      results.append(more);
     } else {
       const empty = el("div", "empty");
       empty.append(
-        el("h2", "", "这个需求，暂时还没找到"),
-        el("p", "", "换一个关键词，或把你想实现的功能记到需求广场。"),
+        el("h2", "", "暂时没有符合条件的插件"),
+        el("p", "", "试试减少筛选条件、切换场景搜索，或提出你的开发需求。"),
         link(
           "带着需求，求开发 →",
           url("submit/request", { title: input.value }),
@@ -516,21 +768,13 @@ function search() {
       );
       results.append(empty);
     }
-    const tail = el("div", "community-note");
-    tail.append(
-      el("p", "", "已有插件不合适？把场景说清楚，让下一件工具从这里开始。"),
-      link(
-        "求开发 ↗",
-        url("submit/request", { title: input.value }),
-        "text-link",
-      ),
-    );
-    results.append(tail);
   }
   function apply() {
     if (input.value) params.set("q", input.value);
     else params.delete("q");
+    params.delete("limit");
     history.replaceState(null, "", url("search"));
+    activeHash = location.hash;
     searchState = new URLSearchParams(params);
     renderNav();
     renderResults();
@@ -546,7 +790,7 @@ function search() {
   input.addEventListener("input", () => {
     if (!composing) {
       clearTimeout(searchTimer);
-      searchTimer = setTimeout(apply, 120);
+      searchTimer = setTimeout(apply, 180);
     }
   });
   input.addEventListener("keydown", (e) => {
@@ -568,9 +812,19 @@ function search() {
 function detail(id) {
   const p = plugins.find((item) => item.id === id);
   if (!p) {
-    notFound();
+    if (catalogState.loading)
+      pageHead("正在读取插件详情", "正在加载本项目的完整目录…");
+    else {
+      notFound(
+        "没有找到这个插件",
+        catalogState.warnings.join(" ") || "请返回全部插件重新查找。",
+      );
+      if (catalogState.warnings.length)
+        main.append(btn("重新读取目录", "secondary", refreshCatalog));
+    }
     return;
   }
+  const look = appearance(p);
   const origin = params.get("from");
   main.append(
     back(
@@ -581,32 +835,47 @@ function detail(id) {
   const head = el("header", "detail-header");
   const identity = el("div", "detail-identity");
   identity.append(
-    el("h1", "", looks[p.id].title),
-    el("p", "", p.category + " · DSH 插件"),
+    el("h1", "", look.title),
+    el("p", "", p.category + " · " + (p.kind || "DSH 插件")),
   );
   head.append(pluginMark(p, "large"), identity);
-  main.append(head, el("p", "detail-summary", looks[p.id].description));
+  main.append(head, el("p", "detail-summary", look.description));
   const facts = el("div", "detail-facts");
   facts.append(
-    el("span", "", looks[p.id].note),
-    el("span", "", "文档已核对 · 待实测"),
+    el("span", "", look.note),
+    el(
+      "span",
+      "",
+      curatedIds.has(p.id) ? "文档已核对 · 待实测" : "社区收录 · 待核验",
+    ),
   );
   main.append(facts);
   const install = el("section", "install-panel");
   const installHeading = el("div", "install-heading");
   installHeading.append(
     el("h2", "", "安装地址"),
-    btn("复制", "copy-chip", () => copy(p.install)),
+    p.install
+      ? btn("复制", "copy-chip", () => copy(p.install))
+      : el("span", "muted", "暂不提供复制"),
   );
-  install.append(installHeading, el("code", "install-code", p.install));
+  install.append(
+    installHeading,
+    el(
+      p.install ? "code" : "p",
+      "install-code",
+      p.install || p.installNote || "安装方式待核实，请查阅作者说明。",
+    ),
+  );
   main.append(install);
   const actions = el("div", "detail-actions");
   actions.append(
-    btn("复制安装清单", "primary", () =>
+    btn("复制使用清单", "primary", () =>
       copy(
         [
           p.name,
-          "安装引用 " + p.install,
+          p.install
+            ? "安装引用 " + p.install
+            : "安装方式 " + (p.installNote || "待核实"),
           "",
           "使用环境",
           ...p.environment.map((text) => "• " + text),
@@ -622,24 +891,62 @@ function detail(id) {
     ),
     btn("分享", "secondary share-button", () => {
       const share = new URL(location.href);
-      share.hash = "/plugin/" + p.id;
+      share.hash = "/plugin/" + encodeURIComponent(p.id);
       copy(share.href);
     }),
   );
+  const favorite = btn("", "secondary", () => {
+    try {
+      const value = readPreference(localStorage, p.id, "favorite") ? 0 : 1;
+      writePreference(localStorage, p.id, "favorite", value);
+      updateFavorite();
+      notify(value ? "已收藏到本机" : "已取消收藏");
+    } catch (e) {
+      notify(e.message || "本机收藏暂不可用");
+    }
+  });
+  function updateFavorite() {
+    try {
+      const saved = Boolean(readPreference(localStorage, p.id, "favorite"));
+      favorite.textContent = saved ? "已收藏" : "收藏";
+      favorite.setAttribute("aria-pressed", String(saved));
+    } catch {
+      favorite.textContent = "收藏";
+    }
+  }
+  updateFavorite();
+  actions.append(favorite);
   main.append(actions);
   const preview = sourcePreview(p);
   if (preview) main.append(preview);
   const useCase = el("div", "use-case");
   useCase.append(
     icon("check"),
-    el("p", "", p.useCase.replace(/^用例参考[：:]\s*/, "")),
+    el(
+      "p",
+      "",
+      (p.useCase || p.summary || "作者尚未提供功能说明。").replace(
+        /^用例参考[：:]\s*/,
+        "",
+      ),
+    ),
   );
   main.append(section("用它做什么", useCase));
   const environment = el("ul");
-  p.environment.forEach((text) => environment.append(el("li", "", text)));
+  (p.environment.length
+    ? p.environment
+    : ["作者未在目录中注明环境要求，请先查看使用说明。"]
+  ).forEach((text) => environment.append(el("li", "", text)));
   main.append(section("准备与安装", environment));
   const steps = el("ol", "install-steps");
-  p.installSteps.forEach((text) => steps.append(el("li", "", text)));
+  (p.installSteps.length
+    ? p.installSteps
+    : [
+        p.install
+          ? "将安装地址复制到 DSH 的插件安装入口，其他准备步骤以作者说明为准。"
+          : "查看下方作者使用说明，按其中步骤安装或使用。",
+      ]
+  ).forEach((text) => steps.append(el("li", "", text)));
   main.append(steps, el("p", "limitation", p.limitation));
   const scan = el("div", "scan-status");
   scan.append(el("strong", "", "正在读取扫描记录…"));
@@ -666,11 +973,57 @@ function detail(id) {
   });
   review.append(summary, dimensions, el("p", "evidence-note", p.review));
   main.append(review);
+  const rating = el("section", "personal-rating");
+  rating.append(
+    el("h2", "", "我的评分"),
+    el("p", "form-hint", "体验后给个分数 · 仅保存在本机，不计入社区评分"),
+  );
+  const stars = el("div", "rating-options");
+  for (let value = 1; value <= 5; value++) {
+    const b = btn(value + " 分", "chip", () => {
+      try {
+        writePreference(localStorage, p.id, "rating", value);
+        updateRating();
+        notify("已保存本机评分");
+      } catch (e) {
+        notify(e.message || "本机评分暂不可用");
+      }
+    });
+    b.dataset.value = String(value);
+    stars.append(b);
+  }
+  function updateRating() {
+    let selected = 0;
+    try {
+      selected = readPreference(localStorage, p.id, "rating");
+    } catch {}
+    for (const b of stars.children)
+      b.setAttribute(
+        "aria-pressed",
+        String(Number(b.dataset.value) === selected),
+      );
+  }
+  updateRating();
+  rating.append(
+    stars,
+    btn("撤回评分", "text-link", () => {
+      try {
+        writePreference(localStorage, p.id, "rating", 0);
+        updateRating();
+        notify("已撤回评分");
+      } catch (e) {
+        notify(e.message);
+      }
+    }),
+  );
+  main.append(rating);
   const sources = el("div", "source-links");
   sources.append(
     external("作者仓库 ↗", "https://github.com/" + p.repo),
     external("使用说明 ↗", p.source),
   );
+  if (p.sourceLabel)
+    sources.append(el("p", "evidence-note", "目录来源：" + p.sourceLabel));
   main.append(sources);
 }
 
@@ -847,11 +1200,41 @@ function submit(kind) {
     const blank = el("option", "", "未收录，我填写仓库");
     blank.value = "";
     known.input.append(blank);
-    plugins.forEach((p) => {
-      const option = el("option", "", p.name);
-      option.value = p.id;
-      known.input.append(option);
-    });
+    const lookup = field(
+      "查找已收录插件",
+      "search",
+      "lookup",
+      "",
+      "输入名称或包名后选择插件；未收录的可直接填写仓库。",
+    );
+    let lookupRequest = 0;
+    const lookupHint = el("p", "form-hint");
+    async function updateKnown() {
+      const number = ++lookupRequest;
+      const list = lookup.input.value
+        ? await findPlugins(lookup.input.value, {})
+        : curated;
+      if (number !== lookupRequest || !known.input.isConnected) return;
+      const old = known.input.value;
+      known.input.replaceChildren(blank);
+      list.slice(0, 40).forEach((p) => {
+        const o = el("option", "", p.name + " · " + (p.packageName || p.repo));
+        o.value = p.id;
+        known.input.append(o);
+      });
+      known.input.value = list.slice(0, 40).some((p) => p.id === old)
+        ? old
+        : "";
+      if (repo) repo.input.disabled = Boolean(known.input.value);
+      lookupHint.textContent =
+        list.length > 40
+          ? "找到 " + list.length + " 个，显示前 40 个；可继续补充关键词。"
+          : "";
+    }
+    lookup.input.addEventListener("input", updateKnown);
+    form.append(lookup.wrap, lookupHint);
+    queueMicrotask(updateKnown);
+    catalogReady = updateKnown;
     repo = field(
       "GitHub 仓库地址",
       "url",
@@ -1019,6 +1402,7 @@ function notFound(
   main.append(link("去找插件", url("search"), "primary"));
 }
 function render() {
+  catalogReady = () => {};
   clearTimeout(searchTimer);
   if (activeHash) scrollPositions.set(activeHash, window.scrollY);
   activeHash = location.hash || "#/home";
@@ -1083,5 +1467,32 @@ document.querySelector(".skip").addEventListener("click", (event) => {
   main.focus();
   main.scrollIntoView();
 });
+async function refreshScans() {
+  scanFailure = false;
+  try {
+    scanStatuses = await getScanStatuses(plugins);
+  } catch {
+    scanFailure = true;
+    scanStatuses = undefined;
+  }
+  if (route?.[0] === "search" && params.get("scan")) render();
+}
+async function refreshCatalog() {
+  catalogState.loading = true;
+  const result = await loadCatalog(curated);
+  plugins = [
+    ...curated
+      .map((item) => result.plugins.find((p) => p.id === item.id))
+      .filter(Boolean),
+    ...result.plugins.filter((p) => !curatedIds.has(p.id)),
+  ];
+  catalogState = { ...result, loading: false };
+  searchWorker?.postMessage({ plugins });
+  if (["search", "plugin", "receipt"].includes(route?.[0])) render();
+  else catalogReady();
+  refreshScans();
+}
+searchWorker?.postMessage({ plugins });
 window.addEventListener("hashchange", render);
 render();
+refreshCatalog();
